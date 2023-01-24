@@ -6,12 +6,28 @@ import unittest
 
 def init_fast_MNMF(
     init_type: str,
-    nFFT: int,
-    nTimeFrames: int,
+    n_FFT: int,
+    n_time_frames: int,
     n_bases: int,
     n_sources: int,
     n_sensors: int,
 ) -> tuple:
+    '''Initialize FastMNMF2 parameters.
+
+    Inputs: 
+    - init_type: str = random, diagonal, circular or gradual
+    - n_FFT (allias F): int = STFT window length
+    - n_time_frames (allias T): int = STFT number of time frames
+    - n_bases (allias K): int = Number of elements (cols for W, rows for H) in W and H
+    - n_sources (allias N): int = Number of instruments to separate from the mix
+    - n_sensors (allias M): int = Number of microphones
+
+    Outputs:
+    - W: Array [N, F, K] = Spectral base of NMF
+    - H: Array [N, K, T] = Activation matrix of NMF
+    - G_tilde: Array [N, M] = Spatial Covariance matrix
+    - Q: Array [F, M, M] = Diagonalizer of G
+    '''
     init_type_dict = {"RANDOM": 0, "DIAGONAL": 1, "CIRCULAR": 2, "GRADUAL": 3}
     try:
         ind = init_type_dict[init_type.upper()]
@@ -25,7 +41,7 @@ def init_fast_MNMF(
             # G_tilde is a vector of size M = n_sensors
             G_tilde = np.random.rand(n_sources, n_sensors)
             # Q is nFFTxMxM
-            Q = np.random.rand(nFFT, n_sensors, n_sensors)
+            Q = np.random.rand(n_FFT, n_sensors, n_sensors)
         case 1:
             # Diagonal init
             G_tilde = ...
@@ -38,27 +54,71 @@ def init_fast_MNMF(
             # Gradual init
             G_tilde = ...
             Q = ...
-    W = np.random.rand(nFFT, n_bases)
-    H = np.random.rand(n_bases, nTimeFrames)
+    W = np.random.rand(n_FFT, n_bases)
+    H = np.random.rand(n_bases, n_time_frames)
     return W, H, G_tilde, Q
 
 
 def update_W(W_old: typing.ArrayLike) -> typing.ArrayLike:
+    '''Update W with constraints.
+    
+    Input:
+    - W_old: Array [N, F, K]
+
+    Output:
+    - W_new: Array [N, F, K]
+
+    Constraints:
+
+    '''
     W_new = ...
     return W_new
 
 
 def update_H(H_old: typing.ArrayLike) -> typing.ArrayLike:
+    '''Update H with constraints.
+    
+    Input:
+    - H_old: Array [N, K, T]
+
+    Output:
+    - H_new: Array [N, K, T]
+
+    Constraints:
+        
+    '''
     H_new = ...
     return H_new
 
 
 def update_G(G_old: typing.ArrayLike) -> typing.ArrayLike:
+    '''Update G_tilde with constraints.
+    
+    Input:
+    - G_old: Array [N, M]
+
+    Output:
+    - G_new: Array [N, M]
+
+    Constraints:
+        
+    '''
     G_new = ...
     return G_new
 
 
 def update_Q(Q_old: typing.ArrayLike) -> typing.ArrayLike:
+    '''Update G_tilde with constraints.
+    
+    Input:
+    - Q_old: Array [F, M, M]
+
+    Output:
+    - Q_new: Array [F, M, M]
+
+    Constraints:
+        
+    '''
     Q_new = ...
     return Q_new
 
@@ -69,6 +129,7 @@ def update_all_params(
     G_old: typing.ArrayLike,
     Q_old: typing.ArrayLike,
 ) -> tuple:
+    '''Update all parameters in the correct order'''
     W_new = update_W(W_old)
     H_new = update_W(H_old)
     G_new = update_W(G_old)
