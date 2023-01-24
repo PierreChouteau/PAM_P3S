@@ -37,16 +37,28 @@ def files_MUSDB(path_in):
 
     return(files_in, files_title)
     
-def MUSDB_data(song_path, Stereo = False, N_fft=512, Hop_length=512, Win_length=None):
+def spectrogram_from_musdb(room_dimension, 
+    abs_coef, 
+    source_locations, 
+    microphone_locations, 
+    song_path, 
+    N_fft=512, 
+    Hop_length=512, 
+    Win_length=None,
+    Display = False):
+
     """ 
+    
     this function process a song from MUSDB18 dataset
-    into a multichannel STFT
+    as a recording in a shoebox room (defined with its 
+    geometry, room absorption, signal locations and 
+    microphones locations) into a multichannel STFT.
 
     Inputs:
-
+    
+    source_locations
+    microphone_locations (warning, locs in `np.c_` class)
     song: int (number of the song)
-    MUSDB18_path: character chain (address of the song folder)
-    Stereo: boolean
     n_fft: frequency steps (512 default)
     hop_length: hop length (51 default)
     win_length: window length
@@ -57,38 +69,36 @@ def MUSDB_data(song_path, Stereo = False, N_fft=512, Hop_length=512, Win_length=
 
     """
     path = song_path
-    data, _ = stempeg.read_stems(path)
+    data, rate = stempeg.read_stems(path)
     channel_nb, time_step, _ = data.shape
     X = []
     Xn = []
 
-    if Stereo == True :
-        for channel in range(1, channel_nb) :
 
-            # Compute the STFT for each channel
-            data_n_left = S[channel].T[0]
-            data_n_right = S[channel].T[1]
+    # Create an shoebox room
+    room = pra.ShoeBox(room_dimension, fs=44100, max_order=15, absorption=abs_coef, sigma2_awgn=1e-8)
 
-            Xstft_left = librosa.stft(data_n_left, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length)
-            Xstft_left = librosa.stft(data_n_left, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length)
+    # Add sources
+    for channel_source, source_loc in zip(range(1,len(data)), source_locations):
+        signal_channel = librosa.core.to_mono(data[channel_source].T)
+        room.add_source(source_loc, signal=signal_channel)
 
-            Xn_left = np.abs(Xstft_left)
-            Xn_right = np.abs(Xstft_left)
+    # Add microphone array
+    mic_array = pra.MicrophoneArray(microphone_locations, rate)
+    room.add_microphone_array(mic_array)
+    room.simulate()
 
-            # Concatenate Xn
-            X.append(Xn_left)
-            X.append(Xn_right)
+    for microphone_n in range(channel_nb - 1) :
 
+        # Compute the STFT for each microphones
+        microphone_output = room.mic_array.signals[microphone_n,:]
+        Xstft = librosa.stft(microphone_output, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length)
+        Xn = np.abs(Xstft)
 
-    elif Stereo == False :
-        for channel in range(1, channel_nb) :
+        if Display :
+            display(ipd.Audio(microphone_output, rate=room.fs))
 
-            # Compute the STFT for each channel
-            data_n = librosa.core.to_mono(S[channel].T)
-            Xstft = librosa.stft(data_n, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length)
-            Xn = np.abs(Xstft)
+        # Concatenate Xn
+        X.append(Xn)
 
-            # Concatenate Xn
-            X.append(Xn)
-
-    return X
+    return (X)
