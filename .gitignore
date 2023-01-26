@@ -127,3 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+Base.py
+FastMNMF2.py

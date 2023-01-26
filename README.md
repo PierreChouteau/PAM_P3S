@@ -26,5 +26,5 @@ conda activate P3S
 - Go into the repository and install the dependencies: 
 ``` 
 cd PAM_P3S
-pip install -r requirements.txt
+pip install -r requirement.txt
 ``` 
