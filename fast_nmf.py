@@ -485,10 +485,10 @@ def separate(
     Qx_FTM = np.einsum("fmi, fti -> ftm", Q_FMM, X_FTM)
     Qinv_FMM = np.linalg.inv(Q_FMM)
 
-    separated_spec = np.einsum(
+    separated_spec_NFT = np.einsum(
         "fj, ftj, nftj -> nft", Qinv_FMM[:, mic_index], Qx_FTM / Y_tilde_FTM, Y_NFTM
     )
-    return separated_spec
+    return separated_spec_NFT
 
 
 def fast_MNMF2(
@@ -500,14 +500,26 @@ def fast_MNMF2(
     n_freq_bins: int,
     n_basis: int,
     algo: str = "IP",
+    mic_index: int = None,
 ):
     """Main function of FastMNMF2
 
     Input
     -----
+    - X_FTM:            Array [F, T, M] = Observed spectrogram
+    - n_iter:           int             = Number of iterations
+    - n_microphones:    int             = Number of microphones
+    - n_sources:        int             = Number of sources
+    - n_time_frames:    int             = Number of time frames
+    - n_freq_bins:      int             = Number of frequency bins
+    - n_basis:          int             = Number of basis functions
+    - algo:             str             = Algorithm to use for Q update
+    - mic_index:        int             = Index of the microphone to separate. All microphones are separated if None
 
     Output
     ------
+    - separated_spec: Array [N, F, T] = Spectrogram of the N separated sources for mic_index
+    - separated_spec: Array [M, N, F, T] = Spectrogram separated for all microphones if mic_index is None
     """
     ############
     ### Init ###
@@ -541,6 +553,7 @@ def fast_MNMF2(
     #################
     ### Main Loop ###
     #################
+
     for k in range(n_iter):
         updatable_params = update_all_params(
             X_FTM,
@@ -554,24 +567,25 @@ def fast_MNMF2(
     ###################
     ### Seaparation ###
     ###################
+    (
+        W_NFK,
+        H_NKT,
+        G_tilde_NM,
+        Q_FMM,
+        Qx_FTM,
+        X_tilde_FTM,
+        Y_tilde_FTM,
+    ) = updatable_params
 
-    # self.separate(mic_index=mic_index)
-    # if save_wav or save_wav_all:
-    #     save_fname = f"{save_dir}/{self.method_name}-sep-{str(self)}.wav"
-    #     self.save_to_wav(self.separated_spec, save_fname=save_fname, shape="FTM")
 
-    # if save_param or save_param_all:
-    #     save_fname = f"{save_dir}/{self.method_name}-param-{str(self)}.h5"
-    #     self.save_param(save_fname)
-
-    # if save_likelihood:
-    #     self.log_likelihood_dict[n_iter] = float(self.calculate_log_likelihood())
-    #     save_fname = f"{save_dir}/{self.method_name}-ll-{str(self)}.txt"
-    #     with open(save_fname, "w") as f:
-    #         for key, val in self.log_likelihood_dict.items():
-    #             f.write(f"it = {key} : log_likelihood = {val}\n")
-
-    return
+    if mic_index is not None:
+        separated_spec = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=mic_index)
+    
+    else:
+        separated_spec = np.zeros((n_microphones , n_sources, n_freq_bins, n_time_frames))
+        for m in range(n_microphones):
+            separated_spec[m] = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=m)
+    return separated_spec
 
 
 def main():
