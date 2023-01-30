@@ -28,3 +28,8 @@ conda activate P3S
 cd PAM_P3S
 pip install -r requirement.txt
 ``` 
+
+- Install the src package:
+```
+pip install -e .
+```
