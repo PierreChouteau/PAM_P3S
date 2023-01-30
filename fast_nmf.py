@@ -7,9 +7,12 @@
 # This script is a re-implementation of FastNMF2 to add other constraints and different initialization methods more freely
 
 from numpy.typing import ArrayLike
-import numpy as np
-from matplotlib import pyplot as plt
-import unittest
+
+try:
+    import cupy as np
+    print("Using GPU")
+except ImportError:
+    import numpy as np
 
 
 def normalize(
@@ -452,11 +455,6 @@ def update_all_params(
     return W_NFK, H_NKT, G_tilde_NM, Q_FMM, Qx_FTM, X_tilde_FTM, Y_tilde_FTM
 
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# !!!!!!!! Beyond this point the functions are not up to date !!!!!!!!
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 def separate(
     X_FTM: ArrayLike,
     Q_FMM: ArrayLike,
@@ -577,12 +575,15 @@ def fast_MNMF2(
         Y_tilde_FTM,
     ) = updatable_params
 
-
     if mic_index is not None:
-        separated_spec = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=mic_index)
-    
+        separated_spec = separate(
+            X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=mic_index
+        )
+
     else:
-        separated_spec = np.zeros((n_microphones , n_sources, n_freq_bins, n_time_frames))
+        separated_spec = np.zeros(
+            (n_microphones, n_sources, n_freq_bins, n_time_frames), dtype=np.complex_
+        )
         for m in range(n_microphones):
             separated_spec[m] = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=m)
     return separated_spec
@@ -590,14 +591,6 @@ def fast_MNMF2(
 
 def main():
     return
-
-
-class FastNMFtest(unittest.TestCase):
-    def setUp(self):
-        ...
-
-    def test_default_widget_size(self):
-        self.assertEqual()  # test , # expected value, # message
 
 
 if __name__ == "__main__":
