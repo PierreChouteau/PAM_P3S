@@ -129,3 +129,7 @@ dmypy.json
 .pyre/
 Base.py
 FastMNMF2.py
+
+# data
+pra/train/
+pra/test/
