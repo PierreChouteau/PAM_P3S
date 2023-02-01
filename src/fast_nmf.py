@@ -7,6 +7,7 @@
 # This script is a re-implementation of FastNMF2 to add other constraints and different initialization methods more freely
 
 from numpy.typing import ArrayLike
+from matplotlib import pyplot as plt
 
 try:
     import cupy as np
@@ -499,6 +500,7 @@ def fast_MNMF2(
     n_basis: int,
     algo: str = "IP",
     mic_index: int = None,
+    show_progress: bool = False,
 ):
     """Main function of FastMNMF2
 
@@ -533,6 +535,9 @@ def fast_MNMF2(
     )
     if algo == "IP":
         XX_FTMM = init_IP(X_FTM)
+    
+    if show_progress:
+        loss = np.zeros(n_iter)
 
     Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
     PSD_NFT = calculate_PSD(W_NFK, H_NKT)
@@ -561,6 +566,9 @@ def fast_MNMF2(
             algo,
             norm_interval=10,
         )
+        if show_progress:
+            loss[k] = calculate_log_likelihood(updatable_params[5], updatable_params[6], updatable_params[3])
+            print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
 
     ###################
     ### Seaparation ###
@@ -586,6 +594,12 @@ def fast_MNMF2(
         )
         for m in range(n_microphones):
             separated_spec[m] = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=m)
+    
+    if show_progress:
+        plt.plot(loss, label="Loss")
+        plt.legend()
+        plt.show()
+
     return separated_spec
 
 
