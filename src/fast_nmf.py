@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 
 try:
     import cupy as np
+
     print("Using GPU")
 except ImportError:
     import numpy as np
@@ -173,6 +174,49 @@ def update_W(
     return W_new_NFK
 
 
+def update_W_split(
+    E_NFL: ArrayLike,
+    U_NLK: ArrayLike,
+    E_inv_NLF: ArrayLike,
+    G_tilde_NM: ArrayLike,
+    X_tilde_FTM: ArrayLike,
+    Y_tilde_FTM: ArrayLike,
+    H_NKT: ArrayLike,
+) -> ArrayLike:
+    """Update W as the product E @ U with E fixed and U updated.
+
+    It is based on the paper "A general and flexible framework for the handling of prior information in Audio Source Separation" by Ozerov & al.
+    E is fixed and U is updated. The matrices sizes can be found at page 4.
+
+    Input
+    -----
+    - E_NFL:        Array [N, F, L] = Source spectral patterns
+    - U_NLK:        Array [N, L, K] = Source spectral weights
+    - E_inv_NLF:    Array [N, L, F] = Inverse of E_NFL
+    - G_tilde_NM:   Array [N, M]    = Diag coefficients of the diagonalized demixing matrix
+    - X_tilde_FTM:  Array [F, T, M] = Power Spectral Density at each microphone
+    - Y_tilde_FTM:  Array [F, T, M] = Sum of (PSD_NFT x G_tilde_NM) over all sources
+    - H_NKT:        Array [N, K, T] = Source model activation matrix
+
+    Output
+    ------
+    - U_new_NLK: Array [N, L, K]
+    """
+
+    tmp1_NFT = np.einsum("nm, ftm -> nft", G_tilde_NM, X_tilde_FTM / (Y_tilde_FTM**2))
+    tmp2_NFT = np.einsum("nm, ftm -> nft", G_tilde_NM, 1 / Y_tilde_FTM)
+
+    numerator = np.einsum("nkt, nft -> nfk", H_NKT, tmp1_NFT)
+    denominator = np.einsum("nkt, nft -> nfk", H_NKT, tmp2_NFT)
+
+    W_old_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+
+    U_new_NLK = np.einsum(
+        "nlf, nfk -> nlk", E_inv_NLF, (W_old_NFK * np.sqrt(numerator / denominator))
+    )
+    return U_new_NLK
+
+
 def update_H(
     H_old_NKT: ArrayLike,
     G_tilde_NM: ArrayLike,
@@ -203,6 +247,49 @@ def update_H(
 
     H_new_NKT = H_old_NKT * np.sqrt(numerator / denominator)
     return H_new_NKT
+
+
+def update_H_split(
+    T_old_NKO: ArrayLike,
+    P_NOT: ArrayLike,
+    P_inv_NTO: ArrayLike,
+    G_tilde_NM: ArrayLike,
+    X_tilde_FTM: ArrayLike,
+    Y_tilde_FTM: ArrayLike,
+    W_NFK: ArrayLike,
+) -> ArrayLike:
+    """Update H as the product T @ P with P fixed and T updated.
+
+    It is based on the paper "A general and flexible framework for the handling of prior information in Audio Source Separation" by Ozerov & al.
+    E is fixed and U is updated. The matrices sizes can be found at page 4.
+
+    Input
+    -----
+    - T_old_NKO     Array [N, K, O] = Time pattern weights
+    - P_NOT:        Array [N, O, T] = Time patterns
+    - G_tilde_NM:   Array [N, M]    = Diag coefficients of the diagonalized demixing matrix
+    - X_tilde_FTM:  Array [F, T, M] = Power Spectral Density at each microphone
+    - Y_tilde_FTM:  Array [F, T, M] = Sum of (PSD_NFT x G_tilde_NM) over all sources
+    - W_NFK:        Array [N, F, K] = Source model base matrix
+
+    Output
+    ------
+    - T_new_NKO: Array [N, K, O]
+    """
+
+    tmp1_NFT = np.einsum("nm, ftm -> nft", G_tilde_NM, X_tilde_FTM / (Y_tilde_FTM**2))
+    tmp2_NFT = np.einsum("nm, ftm -> nft", G_tilde_NM, 1 / Y_tilde_FTM)
+
+    numerator = np.einsum("nfk, nft -> nkt", W_NFK, tmp1_NFT)
+    denominator = np.einsum("nfk, nft -> nkt", W_NFK, tmp2_NFT)
+
+    H_old_NKT = np.einsum("nko, not -> nkt", T_old_NKO, P_NOT)
+
+    T_new_NKO = np.einsum(
+        "nkt, nto -> nko", H_old_NKT * np.sqrt(numerator / denominator), P_inv_NTO
+    )
+
+    return T_new_NKO
 
 
 def update_G(
@@ -456,6 +543,96 @@ def update_all_params(
     return W_NFK, H_NKT, G_tilde_NM, Q_FMM, Qx_FTM, X_tilde_FTM, Y_tilde_FTM
 
 
+def update_all_params_split(
+    X_FTM: ArrayLike,
+    U_NLK: ArrayLike,
+    T_NKO: ArrayLike,
+    G_tilde_NM: ArrayLike,
+    Q_FMM: ArrayLike,
+    Qx_FTM: ArrayLike,
+    X_tilde_FTM: ArrayLike,
+    Y_tilde_FTM: ArrayLike,
+    XX_FTMM: ArrayLike,
+    E_NFL: ArrayLike,
+    E_inv_NLF: ArrayLike,
+    P_NOT: ArrayLike,
+    P_inv_NTO: ArrayLike,
+    index_iteration: int,
+    algo: str = "IP",
+    norm_interval: int = 10,
+) -> tuple:
+    """Update all parameters in the correct order with W and H split
+
+    Input
+    -----
+    - parameters to update
+    - constant parameters and input
+
+    Output
+    ------
+    - updated parameters
+    """
+    H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
+    U_NLK = update_W_split(
+        W_NFK,
+        E_inv_NLF,
+        G_tilde_NM,
+        X_tilde_FTM,
+        Y_tilde_FTM,
+        H_NKT,
+    )
+    W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+    PSD_NFT = calculate_PSD(W_NFK, H_NKT)
+    Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
+
+    T_NKO = update_H_split(
+        T_NKO,
+        P_NOT,
+        G_tilde_NM,
+        X_tilde_FTM,
+        Y_tilde_FTM,
+        W_NFK,
+    )
+    H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
+    PSD_NFT = calculate_PSD(W_NFK, H_NKT)
+    Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
+
+    G_tilde_NM = update_G(
+        G_tilde_NM,
+        PSD_NFT,
+        X_tilde_FTM,
+        Y_tilde_FTM,
+    )
+    Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
+
+    if algo == "IP":
+        Q_FMM = update_Q_IP(
+            Q_FMM,
+            XX_FTMM,
+            Y_tilde_FTM,
+        )
+    elif algo == "ISS":
+        Q_FMM, Qx_FTM = update_Q_ISS(
+            Q_FMM,
+            Qx_FTM,
+            Y_tilde_FTM,
+        )
+    if index_iteration % norm_interval == 0:
+        W_NFK, H_NKT, G_tilde_NM, Q_FMM = normalize(
+            W_NFK,
+            H_NKT,
+            G_tilde_NM,
+            Q_FMM,
+        )
+        Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
+        PSD_NFT = calculate_PSD(W_NFK, H_NKT)
+        Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
+
+    else:
+        Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
+    return U_NLK, T_NKO, G_tilde_NM, Q_FMM, Qx_FTM, X_tilde_FTM, Y_tilde_FTM
+
+
 def separate(
     X_FTM: ArrayLike,
     Q_FMM: ArrayLike,
@@ -535,7 +712,7 @@ def fast_MNMF2(
     )
     if algo == "IP":
         XX_FTMM = init_IP(X_FTM)
-    
+
     if show_progress:
         loss = np.zeros(n_iter)
 
@@ -566,13 +743,15 @@ def fast_MNMF2(
             algo,
             norm_interval=10,
         )
-        if show_progress:
-            loss[k] = calculate_log_likelihood(updatable_params[5], updatable_params[6], updatable_params[3])
+        if show_progress and (k % 10 == 0):
+            loss[k] = calculate_log_likelihood(
+                updatable_params[5], updatable_params[6], updatable_params[3]
+            )
             print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
 
-    ###################
-    ### Seaparation ###
-    ###################
+    ##################
+    ### Separation ###
+    ##################
     (
         W_NFK,
         H_NKT,
@@ -594,7 +773,7 @@ def fast_MNMF2(
         )
         for m in range(n_microphones):
             separated_spec[m] = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=m)
-    
+
     if show_progress:
         plt.plot(loss, label="Loss")
         plt.legend()
