@@ -43,11 +43,34 @@ def normalize(
     return W_NFK, H_NKT, G_tilde_NM, Q_FMM
 
 
-def init_fast_MNMF(
-    init_type: str,
+def init_WH(
     n_FFT: int,
     n_time_frames: int,
     n_basis: int,
+    n_sources: int,
+):
+    """Initialize W and H of source model
+
+    Input
+    -----
+    - n_FFT         (allias F): int = STFT window length
+    - n_time_frames (allias T): int = STFT number of time frames
+    - n_basis       (allias K): int = Number of elements (cols for W, rows for H) in W and H
+    - n_sources     (allias N): int = Number of instruments to separate from the mix
+
+    Output
+    ------
+    - W_NFK:        Array [N, F, K] = Spectral base of NMF
+    - H_NKT:        Array [N, K, T] = Activation matrix of NMF
+    """
+    W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
+    H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
+    return W_NFK, H_NKT
+
+
+def init_GQ(
+    init_type: str,
+    n_FFT: int,
     n_sources: int,
     n_sensors: int,
     G_tilde_NM: ArrayLike = None,
@@ -59,15 +82,11 @@ def init_fast_MNMF(
     -----
     - init_type:                str = random, diagonal, circular or gradual
     - n_FFT         (allias F): int = STFT window length
-    - n_time_frames (allias T): int = STFT number of time frames
-    - n_basis       (allias K): int = Number of elements (cols for W, rows for H) in W and H
     - n_sources     (allias N): int = Number of instruments to separate from the mix
     - n_sensors     (allias M): int = Number of microphones
 
     Outputs
     -------
-    - W_NFK:        Array [N, F, K] = Spectral base of NMF
-    - H_NKT:        Array [N, K, T] = Activation matrix of NMF
     - G_tilde_NM:   Array [N, M]    = Spatial Covariance matrix
     - Q_FMM:        Array [F, M, M] = Diagonalizer of G
 
@@ -90,14 +109,10 @@ def init_fast_MNMF(
             # Random init
             G_tilde_NM = np.random.rand(n_sources, n_sensors)
             Q_FMM = np.random.rand(n_FFT, n_sensors, n_sensors)
-            W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
-            H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
         case 1:
             # Diagonal init
             G_tilde_NM = np.zeros((n_sources, n_sensors)) + G_eps
             Q_FMM = np.tile(np.eye(n_sensors, dtype=np.complex_), (n_FFT, 1, 1))
-            W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
-            H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
 
             for n in range(min(n_sources, n_sensors)):
                 G_tilde_NM[n, n] = 1
@@ -105,8 +120,6 @@ def init_fast_MNMF(
             # Circular init
             G_tilde_NM = np.zeros((n_sources, n_sensors)) + G_eps
             Q_FMM = np.tile(np.eye(n_sensors, dtype=np.complex_), (n_FFT, 1, 1))
-            W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
-            H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
 
             for m in range(n_sensors):
                 G_tilde_NM[m % n_sources, m] = 1
@@ -118,13 +131,7 @@ def init_fast_MNMF(
                 Q_FMM = np.tile(np.eye(n_sensors, dtype=np.complex_), (n_FFT, 1, 1))
                 for m in range(n_sensors):
                     G_tilde_NM[m % n_sources, m] = 1
-                W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
-                H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
-            else:
-                # Next updates with bigger K after ~50 itterations
-                W_NFK = np.random.rand(n_sources, n_FFT, n_basis)
-                H_NKT = np.random.rand(n_sources, n_basis, n_time_frames)
-    return normalize(W_NFK, H_NKT, G_tilde_NM, Q_FMM)
+    return G_tilde_NM, Q_FMM
 
 
 def init_IP(X_FTM: ArrayLike) -> ArrayLike:
@@ -140,6 +147,42 @@ def init_IP(X_FTM: ArrayLike) -> ArrayLike:
     """
     XX_FTMM = np.einsum("fti, ftj -> ftij", X_FTM, X_FTM.conj())
     return XX_FTMM
+
+
+def init_WH_split(
+    n_sources: int,
+    n_basis: int,
+    n_FFT: int,
+    n_time_frames: int,
+    n_notes: int,
+):
+    """Init W and H matrices for split step NMF
+
+    Input
+    -----
+    - n_sources:     int = Number of sources to separate
+    - n_basis:       int = Number of basis elements
+    - n_FFT:         int = Number of frequency bins
+    - n_time_frames: int = Number of time frames
+    - n_notes:       int = Number of notes
+
+    Output
+    ------
+    - E_NFL:        Array [N, F, L] = Source spectral patterns
+    - E_inv_NLF:    Array [N, L, F] = Inverse of E_NFL
+    - U_NLK:        Array [N, L, K] = Source spectral weights
+    - T_NKO         Array [N, K, O] = Time pattern weights
+    - P_NOT:        Array [N, O, T] = Time patterns
+    - P_inv_NTO:    Array [N, T, O] = Inverse of P_NOT
+    """
+    E_NFL = np.random.rand(n_sources, n_FFT, n_notes)
+    E_inv_NLF = np.random.rand(n_sources, n_notes, n_FFT)
+    U_NLK = np.random.rand(n_sources, n_notes, n_basis)
+    T_NKO = np.random.rand(n_sources, n_basis, n_notes)
+    P_NOT = np.random.rand(n_sources, n_notes, n_time_frames)
+    P_inv_NTO = np.random.rand(n_sources, n_time_frames, n_notes)
+
+    return E_NFL, E_inv_NLF, U_NLK, T_NKO, P_NOT, P_inv_NTO
 
 
 def update_W(
@@ -267,6 +310,7 @@ def update_H_split(
     -----
     - T_old_NKO     Array [N, K, O] = Time pattern weights
     - P_NOT:        Array [N, O, T] = Time patterns
+    - P_inv_NTO:    Array [N, T, O] = Inverse of P_NOT
     - G_tilde_NM:   Array [N, M]    = Diag coefficients of the diagonalized demixing matrix
     - X_tilde_FTM:  Array [F, T, M] = Power Spectral Density at each microphone
     - Y_tilde_FTM:  Array [F, T, M] = Sum of (PSD_NFT x G_tilde_NM) over all sources
@@ -588,6 +632,7 @@ def update_all_params_split(
     T_NKO = update_H_split(
         T_NKO,
         P_NOT,
+        P_inv_NTO,
         G_tilde_NM,
         X_tilde_FTM,
         Y_tilde_FTM,
@@ -675,7 +720,9 @@ def fast_MNMF2(
     n_time_frames: int,
     n_freq_bins: int,
     n_basis: int,
+    init: str = "circular",
     algo: str = "IP",
+    split: bool = False,
     mic_index: int = None,
     show_progress: bool = False,
 ):
@@ -691,7 +738,9 @@ def fast_MNMF2(
     - n_freq_bins:      int             = Number of frequency bins
     - n_basis:          int             = Number of basis functions
     - algo:             str             = Algorithm to use for Q update
+    - split:            bool            = If True, the update W and H as split matrices
     - mic_index:        int             = Index of the microphone to separate. All microphones are separated if None
+    - show_progress:    bool            = If True, show the progress bar
 
     Output
     ------
@@ -702,13 +751,23 @@ def fast_MNMF2(
     ### Init ###
     ############
 
-    W_NFK, H_NKT, G_tilde_NM, Q_FMM = init_fast_MNMF(
-        init_type="circular",
+    G_tilde_NM, Q_FMM = init_GQ(
+        init_type=init,
+        n_FFT=n_freq_bins,
+        n_sources=n_sources,
+        n_sensors=n_microphones,
+    )
+    W_NFK, H_NKT = init_WH(
         n_FFT=n_freq_bins,
         n_time_frames=n_time_frames,
         n_basis=n_basis,
         n_sources=n_sources,
-        n_sensors=n_microphones,
+    )
+    W_NFK, H_NKT, G_tilde_NM, Q_FMM = normalize(
+        W_NFK,
+        H_NKT,
+        G_tilde_NM,
+        Q_FMM,
     )
     if algo == "IP":
         XX_FTMM = init_IP(X_FTM)
@@ -779,7 +838,7 @@ def fast_MNMF2(
         plt.legend()
         plt.show()
 
-    return separated_spec
+    return separated_spec, *updatable_params
 
 
 def main():
