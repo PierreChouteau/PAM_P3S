@@ -149,11 +149,9 @@ def init_IP(X_FTM: ArrayLike) -> ArrayLike:
     return XX_FTMM
 
 
-def init_WH_split(
+def init_UT_split(
     n_sources: int,
     n_basis: int,
-    n_FFT: int,
-    n_time_frames: int,
     n_notes: int,
 ):
     """Init W and H matrices for split step NMF
@@ -162,27 +160,89 @@ def init_WH_split(
     -----
     - n_sources:     int = Number of sources to separate
     - n_basis:       int = Number of basis elements
-    - n_FFT:         int = Number of frequency bins
-    - n_time_frames: int = Number of time frames
     - n_notes:       int = Number of notes
 
     Output
     ------
-    - E_NFL:        Array [N, F, L] = Source spectral patterns
-    - E_inv_NLF:    Array [N, L, F] = Inverse of E_NFL
     - U_NLK:        Array [N, L, K] = Source spectral weights
     - T_NKO         Array [N, K, O] = Time pattern weights
-    - P_NOT:        Array [N, O, T] = Time patterns
-    - P_inv_NTO:    Array [N, T, O] = Inverse of P_NOT
     """
-    E_NFL = np.random.rand(n_sources, n_FFT, n_notes)
-    E_inv_NLF = np.random.rand(n_sources, n_notes, n_FFT)
     U_NLK = np.random.rand(n_sources, n_notes, n_basis)
     T_NKO = np.random.rand(n_sources, n_basis, n_notes)
-    P_NOT = np.random.rand(n_sources, n_notes, n_time_frames)
-    P_inv_NTO = np.random.rand(n_sources, n_time_frames, n_notes)
 
-    return E_NFL, E_inv_NLF, U_NLK, T_NKO, P_NOT, P_inv_NTO
+    return U_NLK, T_NKO
+
+
+def init_EP_split(
+    n_sources: int,
+    n_FFT: int,
+    n_time_frames: int,
+    n_notes: int,
+    n_activations: int,
+):
+    """Init W and H matrices for split step NMF
+
+    Input
+    -----
+    - n_sources:     int = Number of sources to separate
+    - n_FFT:         int = Number of frequency bins
+    - n_time_frames: int = Number of time frames
+    - n_notes:       int = Number of notes
+    - n_activations: int = Number of activations
+
+    Output
+    ------
+    - E_NFL:        Array [N, F, L] = Source spectral patterns
+    - P_NOT:        Array [N, O, T] = Time patterns
+    """
+    E_NFL = np.zeros((n_sources, n_FFT, n_notes))
+    P_NOT = np.zeros((n_sources, n_activations, n_time_frames))
+
+    m = max(n_FFT, n_notes)
+    for k in range(m):
+        E_NFL[:, k % n_FFT, k % n_notes] = 1
+    m = max(n_activations, n_time_frames)
+    for k in range(m):
+        P_NOT[:, k % n_activations, k % n_time_frames] = 1
+
+    return E_NFL, P_NOT
+
+
+def inverse_EP(
+    E_NFL: ArrayLike,
+    P_NOT: ArrayLike,
+):
+    """
+
+    Input
+    -----
+    - E_NFL:        Array [N, F, L] = Source spectral patterns
+    - P_NOT:        Array [N, O, T] = Time patterns
+
+    Output
+    ------
+    - E_inv_NLF:    Array [N, L, F] = Inverse of E_NFL
+    - P_inv_NTO:    Array [N, T, O] = Inverse of P_NOT
+    """
+    _, F, L = E_NFL.shape
+    _, O, T = P_NOT.shape
+
+    if F < L:
+        raise ValueError(
+            f"Bad dimension choice: n_FFT={F} < n_notes={L}. No left inverse exists."
+        )
+    if O > T:
+        raise ValueError(
+            f"Bad dimension choice: n_activations={O} > n_time_frames={T}. No right inverse exists."
+        )
+
+    # Left inverse
+    E_inv_NLF = np.linalg.pinv(E_NFL)
+
+    # Right inverse
+    P_inv_NTO = np.linalg.pinv(P_NOT)
+
+    return E_inv_NLF, P_inv_NTO
 
 
 def update_W(
@@ -720,6 +780,10 @@ def fast_MNMF2(
     n_time_frames: int,
     n_freq_bins: int,
     n_basis: int,
+    n_notes: int = 24,
+    n_activations: int = 30,
+    E_NFL: ArrayLike = None,
+    P_NOT: ArrayLike = None,
     init: str = "circular",
     algo: str = "IP",
     split: bool = False,
@@ -737,14 +801,18 @@ def fast_MNMF2(
     - n_time_frames:    int             = Number of time frames
     - n_freq_bins:      int             = Number of frequency bins
     - n_basis:          int             = Number of basis functions
+    - n_notes:          int             = Number of notes
+    - n_activations:    int             = Number of activations
+    - E_NFL:            Array [N, F, L] = Spectral patterns
+    - P_NOT:            Array [N, O, T] = Time patterns
     - algo:             str             = Algorithm to use for Q update
-    - split:            bool            = If True, the update W and H as split matrices
+    - split:            bool            = If True, update W and H as split matrices
     - mic_index:        int             = Index of the microphone to separate. All microphones are separated if None
     - show_progress:    bool            = If True, show the progress bar
 
     Output
     ------
-    - separated_spec: Array [N, F, T] = Spectrogram of the N separated sources for mic_index
+    - separated_spec: Array [N, F, T]    = Spectrogram of the N separated sources for mic_index
     - separated_spec: Array [M, N, F, T] = Spectrogram separated for all microphones if mic_index is None
     """
     ############
@@ -757,12 +825,31 @@ def fast_MNMF2(
         n_sources=n_sources,
         n_sensors=n_microphones,
     )
-    W_NFK, H_NKT = init_WH(
-        n_FFT=n_freq_bins,
-        n_time_frames=n_time_frames,
-        n_basis=n_basis,
-        n_sources=n_sources,
-    )
+
+    if split:
+        U_NLK, T_NKO = init_UT_split(
+            n_sources,
+            n_basis,
+            n_notes,
+        )
+        if E_NFL is None or P_NOT is None:
+            E_NFL, P_NOT = init_EP_split(
+                n_sources,
+                n_freq_bins,
+                n_time_frames,
+                n_notes,
+                n_activations,
+            )
+        E_inv_NLF, P_inv_NTO = inverse_EP(E_NFL, P_NOT)
+        W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+        H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
+    else:
+        W_NFK, H_NKT = init_WH(
+            n_FFT=n_freq_bins,
+            n_time_frames=n_time_frames,
+            n_basis=n_basis,
+            n_sources=n_sources,
+        )
     W_NFK, H_NKT, G_tilde_NM, Q_FMM = normalize(
         W_NFK,
         H_NKT,
@@ -773,53 +860,100 @@ def fast_MNMF2(
         XX_FTMM = init_IP(X_FTM)
 
     if show_progress:
-        loss = np.zeros(n_iter)
+        loss = np.zeros(n_iter // 10 + 1)
 
     Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
     PSD_NFT = calculate_PSD(W_NFK, H_NKT)
     Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
 
-    updatable_params = (
-        W_NFK,
-        H_NKT,
-        G_tilde_NM,
-        Q_FMM,
-        Qx_FTM,
-        X_tilde_FTM,
-        Y_tilde_FTM,
-    )
+    if split:
+        updatable_params = (
+            U_NLK,
+            T_NKO,
+            G_tilde_NM,
+            Q_FMM,
+            Qx_FTM,
+            X_tilde_FTM,
+            Y_tilde_FTM,
+        )
+    else:
+        updatable_params = (
+            W_NFK,
+            H_NKT,
+            G_tilde_NM,
+            Q_FMM,
+            Qx_FTM,
+            X_tilde_FTM,
+            Y_tilde_FTM,
+        )
 
     #################
     ### Main Loop ###
     #################
 
-    for k in range(n_iter):
-        updatable_params = update_all_params(
-            X_FTM,
-            *updatable_params,
-            XX_FTMM,
-            k,
-            algo,
-            norm_interval=10,
-        )
-        if show_progress and (k % 10 == 0):
-            loss[k] = calculate_log_likelihood(
-                updatable_params[5], updatable_params[6], updatable_params[3]
+    if split:
+        for k in range(n_iter):
+            updatable_params = update_all_params_split(
+                X_FTM,
+                *updatable_params,
+                XX_FTMM,
+                E_NFL,
+                E_inv_NLF,
+                P_NOT,
+                P_inv_NTO,
+                k,
+                algo,
+                norm_interval=10,
             )
-            print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
+            if show_progress and (k % 10 == 0):
+                loss[k] = calculate_log_likelihood(
+                    updatable_params[2],
+                    updatable_params[3],
+                    updatable_params[5],
+                    updatable_params[6],
+                    E_inv_NLF,
+                    P_inv_NTO,
+                )
+                print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
+    else:
+        for k in range(n_iter):
+            updatable_params = update_all_params(
+                X_FTM,
+                *updatable_params,
+                XX_FTMM,
+                k,
+                algo,
+                norm_interval=10,
+            )
+            if show_progress and (k % 10 == 0):
+                loss[k] = calculate_log_likelihood(
+                    updatable_params[5], updatable_params[6], updatable_params[3]
+                )
+                print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
 
     ##################
     ### Separation ###
     ##################
-    (
-        W_NFK,
-        H_NKT,
-        G_tilde_NM,
-        Q_FMM,
-        Qx_FTM,
-        X_tilde_FTM,
-        Y_tilde_FTM,
-    ) = updatable_params
+    if split:
+        (
+            U_NLK,
+            T_NKO,
+            G_tilde_NM,
+            Q_FMM,
+            Qx_FTM,
+            X_tilde_FTM,
+            Y_tilde_FTM,
+        ) = updatable_params
+    else:
+        (
+            W_NFK,
+            H_NKT,
+            G_tilde_NM,
+            Q_FMM,
+            Qx_FTM,
+            X_tilde_FTM,
+            Y_tilde_FTM,
+        ) = updatable_params
 
     if mic_index is not None:
         separated_spec = separate(
@@ -842,6 +976,12 @@ def fast_MNMF2(
 
 
 def main():
+    N, F, T, L, O = 4, 32, 10, 3, 5
+    E, P = init_EP_split(N, F, T, L, O)
+    E_inv, P_inv = inverse_EP(E, P)
+    with np.printoptions(edgeitems=np.inf, linewidth=np.inf):
+        print(E_inv @ E)
+        print(P @ P_inv)
     return
 
 
