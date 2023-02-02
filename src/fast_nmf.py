@@ -153,6 +153,7 @@ def init_UT_split(
     n_sources: int,
     n_basis: int,
     n_notes: int,
+    n_activations: int,
 ):
     """Init W and H matrices for split step NMF
 
@@ -168,7 +169,7 @@ def init_UT_split(
     - T_NKO         Array [N, K, O] = Time pattern weights
     """
     U_NLK = np.random.rand(n_sources, n_notes, n_basis)
-    T_NKO = np.random.rand(n_sources, n_basis, n_notes)
+    T_NKO = np.random.rand(n_sources, n_basis, n_activations)
 
     return U_NLK, T_NKO
 
@@ -678,7 +679,8 @@ def update_all_params_split(
     """
     H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
     U_NLK = update_W_split(
-        W_NFK,
+        E_NFL,
+        U_NLK,
         E_inv_NLF,
         G_tilde_NM,
         X_tilde_FTM,
@@ -831,6 +833,7 @@ def fast_MNMF2(
             n_sources,
             n_basis,
             n_notes,
+            n_activations,
         )
         if E_NFL is None or P_NOT is None:
             E_NFL, P_NOT = init_EP_split(
@@ -976,12 +979,27 @@ def fast_MNMF2(
 
 
 def main():
-    N, F, T, L, O = 4, 32, 10, 3, 5
-    E, P = init_EP_split(N, F, T, L, O)
-    E_inv, P_inv = inverse_EP(E, P)
-    with np.printoptions(edgeitems=np.inf, linewidth=np.inf):
-        print(E_inv @ E)
-        print(P @ P_inv)
+    # N, F, T, L, O = 4, 32, 10, 3, 5
+    # E, P = init_EP_split(N, F, T, L, O)
+    # E_inv, P_inv = inverse_EP(E, P)
+    # with np.printoptions(edgeitems=np.inf, linewidth=np.inf):
+    #     print(E_inv @ E)
+    #     print(P @ P_inv)
+
+    F, T, M = 1024, 100, 4
+    dummy_X = np.random.rand(F, T, M) * (1 + 1j)
+    separated_spec, *updatable_params = fast_MNMF2(
+        dummy_X,
+        n_iter=10,
+        n_sources=M - 1,
+        n_microphones=M,
+        n_time_frames=T,
+        n_freq_bins=F,
+        n_basis=32,
+        n_notes=24,
+        n_activations=10,
+        split=True,
+    )
     return
 
 
