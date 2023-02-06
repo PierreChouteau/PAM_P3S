@@ -1,6 +1,6 @@
 # import libraries
 import IPython.display as ipd
-from  IPython.display import display
+from IPython.display import display
 
 import os
 import pyroomacoustics as pra
@@ -11,50 +11,50 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def get_files(path_in, extension='.mp4'):
+def get_files(path_in, extension=".mp4"):
 
-    """ 
-        This function take the path to a folder as input
-        and creates a list of the files contained inside and their names
+    """
+    This function take the path to a folder as input
+    and creates a list of the files contained inside and their names
 
 
-        Inputs: 
-        ------------------------------------------------------
-        path_in: 
-            path to the folder containing the files to be processed 
-        
-        extension:
-            extension of the files to be processed (default = '.mp4')
-            
-        Output:
-        ------------------------------------------------------
-        files_in: 
-            list of the files contained in the folder
-            
-        files_title:
-            list of the names of the files contained in the folder
-        
+    Inputs:
+    ------------------------------------------------------
+    path_in: string
+        path to the folder containing the files to be processed
+
+    extension: string
+        extension of the files to be processed (default = '.mp4')
+
+    Output:
+    ------------------------------------------------------
+    files_in: list of string (n_files)
+        list of the files contained in the folder
+
+    files_title: list of string (n_files)
+        list of the names of the files contained in the folder
+
     """
     files_in = []
     files_title = []
 
-    # extract files 
-    for r, _ , f in os.walk(path_in):
+    # extract files
+    for r, _, f in os.walk(path_in):
         for file in f:
             if extension in file:
                 # file address
                 files_in.append(os.path.join(r, file))
                 # file author + song
                 files_title.append(file[:-9])
-                
+
     files_in.sort()
-    
+
     return files_in, files_title
 
 
 def room_sources_micro(
     audio_list,
-    rate, 
+    rate,
     audio_length,
     room,
     source_locations,
@@ -62,91 +62,86 @@ def room_sources_micro(
     microphone_names,
     source_dir=None,
     mic_dir=None,
-    display_room = False,
-    ):
+    display_room=False,
+):
 
-    """ 
-    
+    """
+
     this function process a song from MUSDB18 dataset
-    as a recording in a shoebox room (defined with its 
-    geometry, room absorption, signal locations and 
+    as a recording in a shoebox room (defined with its
+    geometry, room absorption, signal locations and
     microphones locations) into a multichannel STFT.
 
     Inputs:
     ------------------------------------------------------
+    audio_list: list or numpy.ndarray (n_channels, n_samples)
+        list of the audio files to be processed
+
+    rate: int
+        sampling rate 
+
+    audio_length: int
+        length of the audio signal
+
     room: room object (pyroomacoustics) - see pyroomacoustics documentation
-        WARNING: the definition of the room is done outside the function, and should 
+        WARNING: the definition of the room is done outside the function, and should
         not contain any source or microphone. Just the geometry, the absorption and the sampling rate.
-    
-    audio_list: matrix (n_channels, n_samples)
-        list of the audio files to be processed: matrix (n_channels, n_samples)
-    
-    source_locations: list of list
-        localization of the sources in the room 
-        
-    microphone_locations: list of string
+
+    source_locations: list of list (n_sources, n_dimensions) 
+        localization of the sources in the room
+
+    microphone_locations: list of string (n_channels)
         localization of the micros in the room (warning, locs in `np.c_` class)
-        
-    microphone_names: 
+
+    microphone_names: list of string (n_channels)
         name of the microphones
-        
+
+    source_dir: 
+        source directivity (pyroomacoustics directivity object)
+
     mic_dir:
         microphone directivity (pyroomacoustics directivity object)
-        
-    song_path: 
-        path to the song (string)
-        
-    audio_length: 
-        length of the audio signal (int)
-        
-    L: 
-        frame size (2048 default)
-        
-    hop: 
-        hop length (512 default)
-        
-    display_audio: 
-        bool (display audio signal)
-        
-    display_room: 
+
+    display_room:
         bool (display room geometry)
 
 
 
     Output
-    ---
+    ------------------------------------------------------
 
     room: room object (pyroomacoustics)
         room object with the sources and microphones added
-        
-    separate_recordings:
+
+    separate_recordings: 
         recordings of the sources in the room (n_sources, n_channels, n_samples)
-    
+
     mics_signals:
         recordings of the microphones in the room (n_channels, n_samples)
-    
+
     """
-    
+
     # Add sources
     for source, source_loc in zip(audio_list, source_locations):
-        signal_channel = librosa.core.to_mono(source[:rate*audio_length, :].T)
-        room.add_source(position=source_loc, directivity=source_dir, signal=signal_channel)
+        signal_channel = librosa.core.to_mono(source[: rate * audio_length, :].T)
+        room.add_source(
+            position=source_loc, directivity=source_dir, signal=signal_channel
+        )
 
     # Add microphone array
     mic_array = pra.MicrophoneArray(microphone_locations, rate)
     room.add_microphone_array(mic_array, directivity=mic_dir)
-    
+
     # Recordings
     separate_recordings = room.simulate(return_premix=True)
     mics_signals = np.sum(separate_recordings, axis=0)
 
     if display_room:
-        for microphone_n in range(microphone_locations.shape[1]) :
+        for microphone_n in range(microphone_locations.shape[1]):
             print(f"Microphone {microphone_names[microphone_n]}")
             display(ipd.Audio(mics_signals[microphone_n], rate=room.fs))
 
     return room, separate_recordings, mics_signals
-
 
 
 def spectrogram_from_mics_signal(
@@ -155,83 +150,83 @@ def spectrogram_from_mics_signal(
     rate=44100,
     L=2048,
     hop=512,
-    display_audio = False,
-    display_spectrogram = False,
-    ):
-    
-    """ 
-        This function process an audio signal with multiple channels
-        and return the STFT multi-channel of the signal
-        
-        
-        Inputs:
-        ------------------------------------------------------
-        mics_signal: 
-            audio signal (n_channels, n_samples)
-            
-        microphone_names: 
-            name of the microphones
-        
-        rate:
-            sampling rate (int)
-            
-        L: 
-            frame size (2048 default)
-            
-        hop: 
-            hop length (512 default)
-            
-        display_audio: 
-            bool (display audio signal)
-            
-        display_spectrogram:
-            bool (display spectrogram)
-            
+    display_audio=False,
+    display_spectrogram=False,
+):
 
-        Output:
-        ------------------------------------------------------
-        X: (n_frames, n_frequencies, n_channels)
-            multi-channel STFT of mics_signal 
-    
     """
-    
+    This function process an audio signal with multiple channels
+    and return the STFT multi-channel of the signal
+
+
+    Inputs:
+    ------------------------------------------------------
+    mics_signal: numpy.ndarray (n_channels, n_samples)
+        audio signal from each microphone
+
+    microphone_names: list of string (n_channels)
+        name of the microphones
+
+    rate: int
+        sampling rate (44100 default)
+
+    L: int
+        frame size (2048 default)
+
+    hop: int
+        hop length (512 default)
+
+    display_audio:
+        bool (display audio signal)
+
+    display_spectrogram:
+        bool (display spectrogram)
+
+
+    Output:
+    ------------------------------------------------------
+    X: (n_frames, n_frequencies, n_channels)
+        multi-channel STFT of mics_signal
+
+    """
+
     # STFT parameters
     win_a = pra.hamming(L)
     win_s = pra.transform.stft.compute_synthesis_window(win_a, hop)
-          
+
     # Observation vector in the STFT domain
     X = pra.transform.stft.analysis(mics_signals.T, L, hop, win=win_a)
 
     if display_audio:
-        for microphone_n in range(len(microphone_names)) :
+        for microphone_n in range(len(microphone_names)):
             print(f"Microphone {microphone_names[microphone_n]}")
             display(ipd.Audio(mics_signals[microphone_n], rate=rate))
 
     if display_spectrogram:
-        for microphone_n in range(len(microphone_names)) :
+        for microphone_n in range(len(microphone_names)):
             plt.figure(figsize=(10, 4))
             plt.specgram(mics_signals[microphone_n], NFFT=L, Fs=rate)
-            plt.xlabel('Time')
-            plt.ylabel('Frequency')
+            plt.xlabel("Time")
+            plt.ylabel("Frequency")
             plt.tight_layout()
             plt.title(f"Spectrogram of microphone {microphone_names[microphone_n]}")
             plt.show()
-    
+
     return X
 
 
 def shoebox_room(
-    room_dimension, 
-    abs_coef=0.35, 
-    rate = 44100,
-    max_order = 15,
+    room_dimension,
+    abs_coef=0.35,
+    rate=44100,
+    max_order=15,
     sigma2_awgn=1e-8,
-    display_room = False,
-    ):
+    display_room=False,
+):
 
-    """ 
-    This function creates a shoebox room (defined 
-    with its geometry, room absorption, source 
+    """
+    This function creates a shoebox room (defined
+    with its geometry, room absorption, source
     locations and microphones locations)
 
     Input
@@ -250,78 +245,81 @@ def shoebox_room(
 
     """
     # Create an shoebox room
-    room = pra.ShoeBox(room_dimension, fs=rate, max_order=max_order, absorption=abs_coef, sigma2_awgn=sigma2_awgn)
-    
+    room = pra.ShoeBox(
+        room_dimension,
+        fs=rate,
+        max_order=max_order,
+        absorption=abs_coef,
+        sigma2_awgn=sigma2_awgn,
+    )
+
     if display_room:
         fig, ax = room.plot()
         lim = 9
         ax.set_xlim([0, lim])
         ax.set_ylim([0, lim])
         ax.set_zlim([0, lim])
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
 
     return room
 
 
-def W(path, L=2048, pitch_min=21, pitch_max=109):
+def compute_W(path, L=2048, pitch_min=21, pitch_max=109):
     """
-        This function computes the PSD of the instrument notes from an audio file
-        and returns the matrix W, that correspond to the dictionary of the instrument.
-        
-        
-        Inputs:
-        ------------------------------------------------------
-        
-        path :
-            path to the audio files of the instrument notes (str) - ex: './piano/' - 1 path per instrument 
-        
-        L :
-            frame size (2048 default)
-        
-        pitch_min :
-            minimum pitch of the instrument (21 default)
-        
-        pitch_max :
-            maximum pitch of the instrument (109 default)
-            
-            
-        Returns:
-        ------------------------------------------------------
-        
-        W : (n_frequencies, n_notes)
-            matrix of the instrument notes PSD
-            
-        notes : (n_notes, n_samples)
-            list of the instrument notes (audio signal)
-            
-        notes_psd : (n_notes, n_frequencies)
-            matric of the instrument notes PSD
-            
-        freqs : (n_frequencies)
-            list of the frequencies of the PSD
-        
+    This function computes the PSD of the instrument notes from an audio file
+    and returns the matrix W, that correspond to the dictionary of the instrument.
+
+
+    Inputs:
+    ------------------------------------------------------
+
+    path : string
+        path to the audio files of the instrument notes (str) - ex: './piano/' - 1 path per instrument
+
+    L : int
+        frame size (2048 default)
+
+    pitch_min : int
+        minimum pitch of the instrument (21 default)
+
+    pitch_max : int
+        maximum pitch of the instrument (109 default)
+
+
+    Returns:
+    ------------------------------------------------------
+
+    W : numpy.ndarray (n_frequencies, n_notes)
+        matrix of the instrument notes PSD
+
+    notes : list (n_notes, n_samples)
+        list of the instrument notes (audio signal)
+
+    notes_psd : numpy.ndarray (n_notes, n_frequencies)
+        matric of the instrument notes PSD
+
+    freqs : list (n_frequencies)
+        list of the frequencies of the PSD
+
     """
     notes = []
     notes_psd = []
 
     pitches = np.arange(pitch_min, pitch_max)
 
-    for i, pitch in enumerate(pitches): 
-        xt, samplerate = librosa.load(path+'{}.wav'.format(str(int(pitch))), sr=None)
+    for i, pitch in enumerate(pitches):
+        xt, samplerate = librosa.load(path + "{}.wav".format(str(int(pitch))), sr=None)
         freqs, Pxx_den = sp.signal.welch(xt, nfft=L)
         notes.append(xt)
         notes_psd.append(Pxx_den)
-    
+
     notes_psd = np.asarray(notes_psd)
 
     W_piano = notes_psd.T
-    
+
     return W_piano, notes, notes_psd, freqs
-
-
-
 
 
 def room_spectrogram_from_musdb(
@@ -332,15 +330,15 @@ def room_spectrogram_from_musdb(
     audio_length,
     L=2048,
     hop=512,
-    rate = 44100, 
-    display_audio = False,
-    ):
+    rate=44100,
+    display_audio=False,
+):
 
-    """ 
-    
+    """
+
     this function process a song from MUSDB18 dataset
-    as a recording in a shoebox room (defined with its 
-    geometry, room absorption, signal locations and 
+    as a recording in a shoebox room (defined with its
+    geometry, room absorption, signal locations and
     microphones locations) into a multichannel STFT.
 
     Input
@@ -369,18 +367,22 @@ def room_spectrogram_from_musdb(
     X = []
 
     # Add sources
-    for channel_source, source_loc in zip(range(1,len(data)), source_locations):
-        signal_channel = librosa.core.to_mono(data[channel_source, :rate*audio_length, :].T)
-        room.add_source(position = source_loc, directivity = source_dir, signal=signal_channel)
+    for channel_source, source_loc in zip(range(1, len(data)), source_locations):
+        signal_channel = librosa.core.to_mono(
+            data[channel_source, : rate * audio_length, :].T
+        )
+        room.add_source(
+            position=source_loc, directivity=source_dir, signal=signal_channel
+        )
 
     # Recordings
     separate_recordings = room.simulate(return_premix=True)
     mics_signals = np.sum(separate_recordings, axis=0)
-    
+
     # STFT parameters
     win_a = pra.hamming(L)
     win_s = pra.transform.stft.compute_synthesis_window(win_a, hop)
-          
+
     # Observation vector in the STFT domain
     for channel in range(channel_nb - 1):
 
@@ -390,33 +392,33 @@ def room_spectrogram_from_musdb(
     X = np.array(X)
 
     if display_audio:
-        for microphone_n in range(channel_nb - 1) :
+        for microphone_n in range(channel_nb - 1):
             display(ipd.Audio(mics_signals[microphone_n], rate=room.fs))
 
     return X, separate_recordings, mics_signals
 
 
-
 def spectrogram_from_musdb(
-    room_dimension, 
-    abs_coef, 
-    source_locations, 
-    microphone_locations, 
-    song_path, 
-    N_fft=512, 
-    Hop_length=512, 
+    room_dimension,
+    abs_coef,
+    source_locations,
+    microphone_locations,
+    song_path,
+    N_fft=512,
+    Hop_length=512,
     Win_length=None,
-    Display = False):
+    Display=False,
+):
 
-    """ 
-    
+    """
+
     this function process a song from MUSDB18 dataset
-    as a recording in a shoebox room (defined with its 
-    geometry, room absorption, signal locations and 
+    as a recording in a shoebox room (defined with its
+    geometry, room absorption, signal locations and
     microphones locations) into a multichannel STFT.
 
     Inputs:
-    
+
     source_locations
     microphone_locations (warning, locs in `np.c_` class)
     song: int (number of the song)
@@ -435,12 +437,13 @@ def spectrogram_from_musdb(
     X = []
     Xn = []
 
-
     # Create an shoebox room
-    room = pra.ShoeBox(room_dimension, fs=44100, max_order=15, absorption=abs_coef, sigma2_awgn=1e-8)
+    room = pra.ShoeBox(
+        room_dimension, fs=44100, max_order=15, absorption=abs_coef, sigma2_awgn=1e-8
+    )
 
     # Add sources
-    for channel_source, source_loc in zip(range(1,len(data)), source_locations):
+    for channel_source, source_loc in zip(range(1, len(data)), source_locations):
         signal_channel = librosa.core.to_mono(data[channel_source].T)
         room.add_source(source_loc, signal=signal_channel)
 
@@ -449,14 +452,16 @@ def spectrogram_from_musdb(
     room.add_microphone_array(mic_array)
     room.simulate()
 
-    for microphone_n in range(channel_nb - 1) :
+    for microphone_n in range(channel_nb - 1):
 
         # Compute the STFT for each microphones
-        microphone_output = room.mic_array.signals[microphone_n,:]
-        Xstft = librosa.stft(microphone_output, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length)
+        microphone_output = room.mic_array.signals[microphone_n, :]
+        Xstft = librosa.stft(
+            microphone_output, n_fft=N_fft, hop_length=Hop_length, win_length=Win_length
+        )
         Xn = np.abs(Xstft)
 
-        if Display :
+        if Display:
             display(ipd.Audio(microphone_output, rate=room.fs))
 
         # Concatenate Xn
@@ -465,9 +470,9 @@ def spectrogram_from_musdb(
     return X
 
 
-
 def main():
     return
+
 
 if __name__ == "__main__":
     main()
