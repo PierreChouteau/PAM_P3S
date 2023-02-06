@@ -233,15 +233,15 @@ def shoebox_room(
     ---
     - room_dimension:       Array [length, width, height]   = room dimensions
     - abs_coef:             float                           = Sabine absorbtion coefficient
-    - microphone_locations: np.c_ [[3D locations],...]      = microphones locations
-    - microphone_dir:       optionnal, directivity          = microphones directivity
     - rate:                 optionnal, int                  = rate of the microphone (44100 default)
+    - max_order:            optionnal, int                  = maximum reflection order in the image source model
+    - sigma2_awgn:          optionnal, float                = variance of the additive white Gaussian noise added during simulation
     - display_room:         optionnal, bool                 = room display (False default)
 
     Output
     ---
 
-    - room:                 ShoeBox                         = room
+    - room:                 room object (pyroom acoustics)  = room
 
     """
     # Create an shoebox room
