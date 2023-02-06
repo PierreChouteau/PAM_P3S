@@ -74,11 +74,11 @@ def room_sources_micro(
 
     Inputs:
     ------------------------------------------------------
-    audio_list: list or numpy.ndarray (n_channels, n_samples)
+    audio_list: list or numpy.ndarray (n_sources, n_channels, n_samples)
         list of the audio files to be processed
 
     rate: int
-        sampling rate 
+        sampling rate
 
     audio_length: int
         length of the audio signal
@@ -87,7 +87,7 @@ def room_sources_micro(
         WARNING: the definition of the room is done outside the function, and should
         not contain any source or microphone. Just the geometry, the absorption and the sampling rate.
 
-    source_locations: list of list (n_sources, n_dimensions) 
+    source_locations: list of list (n_sources, n_dimensions)
         localization of the sources in the room
 
     microphone_locations: list of string (n_channels)
@@ -96,7 +96,7 @@ def room_sources_micro(
     microphone_names: list of string (n_channels)
         name of the microphones
 
-    source_dir: 
+    source_dir:
         source directivity (pyroomacoustics directivity object)
 
     mic_dir:
@@ -113,7 +113,7 @@ def room_sources_micro(
     room: room object (pyroomacoustics)
         room object with the sources and microphones added
 
-    separate_recordings: 
+    separate_recordings:
         recordings of the sources in the room (n_sources, n_channels, n_samples)
 
     mics_signals:
@@ -123,7 +123,7 @@ def room_sources_micro(
 
     # Add sources
     for source, source_loc in zip(audio_list, source_locations):
-        signal_channel = librosa.core.to_mono(source[: rate * audio_length, :].T)
+        signal_channel = librosa.core.to_mono(source[:, : rate * audio_length])
         room.add_source(
             position=source_loc, directivity=source_dir, signal=signal_channel
         )
@@ -132,14 +132,19 @@ def room_sources_micro(
     mic_array = pra.MicrophoneArray(microphone_locations, rate)
     room.add_microphone_array(mic_array, directivity=mic_dir)
 
+    if display_room:
+        fig, ax = room.plot()
+        lim = np.max(room.shoebox_dim)
+        ax.set_xlim([0, lim])
+        ax.set_ylim([0, lim])
+        ax.set_zlim([0, lim])
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+
     # Recordings
     separate_recordings = room.simulate(return_premix=True)
     mics_signals = np.sum(separate_recordings, axis=0)
-
-    if display_room:
-        for microphone_n in range(microphone_locations.shape[1]):
-            print(f"Microphone {microphone_names[microphone_n]}")
-            display(ipd.Audio(mics_signals[microphone_n], rate=room.fs))
 
     return room, separate_recordings, mics_signals
 
@@ -150,6 +155,7 @@ def spectrogram_from_mics_signal(
     rate=44100,
     L=2048,
     hop=512,
+    type="stft",
     display_audio=False,
     display_spectrogram=False,
 ):
@@ -176,6 +182,9 @@ def spectrogram_from_mics_signal(
     hop: int
         hop length (512 default)
 
+    type: string (default 'stft')
+        define the type of the transformation
+
     display_audio:
         bool (display audio signal)
 
@@ -190,12 +199,36 @@ def spectrogram_from_mics_signal(
 
     """
 
-    # STFT parameters
-    win_a = pra.hamming(L)
-    win_s = pra.transform.stft.compute_synthesis_window(win_a, hop)
+    if type == "stft":
+        # STFT parameters
+        win_a = pra.hamming(L)
+        # win_s = pra.transform.stft.compute_synthesis_window(win_a, hop)
 
-    # Observation vector in the STFT domain
-    X = pra.transform.stft.analysis(mics_signals.T, L, hop, win=win_a)
+        # Observation vector in the STFT domain
+        X = pra.transform.stft.analysis(mics_signals.T, L, hop, win=win_a)
+
+    elif type == "cqt":
+        X = librosa.cqt(
+            mics_signals,
+            sr=rate,
+            hop_length=hop,
+            fmin=None,
+            n_bins=84,
+            bins_per_octave=12,
+            tuning=0.0,
+            filter_scale=1,
+            norm=1,
+            sparsity=0.01,
+            window="hann",
+            scale=True,
+            pad_mode="constant",
+            res_type=None,
+            dtype=None,
+        )
+        X = X.transpose(2, 1, 0)
+
+    else:
+        return NameError
 
     if display_audio:
         for microphone_n in range(len(microphone_names)):
@@ -241,7 +274,7 @@ def shoebox_room(
     Output
     ---
 
-    - room:                 room object (pyroom acoustics)  = room
+    - room:                 ShoeBox                         = room
 
     """
     # Create an shoebox room
