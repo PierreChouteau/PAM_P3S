@@ -154,8 +154,40 @@ def extract_and_save_notes(
     save_notes_multiprocess(notes, instrument, midi_pitch, sr, save_path)
 
 
+def compute_spectro(data: np.ndarray, nfft: int):
+    return np.abs(np.fft.fft(data, nfft))
+
+
+def save_matrix(instrument: str, matrix: np.ndarray, path: str):
+    save_path = join(path, "Matrix")
+    if not isdir(save_path):
+        mkdir(save_path)
+    filename = join(save_path, f"Matrix_{instrument}.npy")
+    np.save(filename, matrix)
+
+def create_spectral_matrix(instrument: str, path: str, n_notes: int, pizz: bool = False, nfft: int = 2048):
+    # n_notes is the max number of notes among the instruments. 
+    # If the current instrument has less notes, the matrix will be padded with zeros.
+
+    path_notes = join(path, instrument, "Notes")
+    files = [join(path_notes, file) for file in listdir(path_notes)]
+    
+    if pizz:
+        path_pizz = join(path, instrument, "Pizz", "Notes")
+        files += [join(path_pizz, file) for file in listdir(path_pizz)]
+    
+    spectral_matrix = np.zeros((nfft, n_notes))
+    for i, file in enumerate(files):
+        data, sr = sf.read(file)
+        spectral_matrix[:, i] = compute_spectro(data, nfft)
+    save_matrix(instrument, spectral_matrix, path)
+
+def load_matrix(filename: str):
+    return np.load(filename)
+
+
 def main():
-    path_scales = "Sounds/Scales/"
+    path_scales = join("Sounds", "Scales")
 
     # params_instru = (start_time, nb_notes, bpm, midi_pitch_start)
     param_violin1 = (0.73, 39, 30.3, 55)
@@ -177,7 +209,12 @@ def main():
     # extract_and_save_notes(path_scales, "Violin1", param_violin1_pizz, pizz=True)
     # extract_and_save_notes(path_scales, "Violin2", param_violin2_pizz, pizz=True)
     # extract_and_save_notes(path_scales, "Cello", param_cello_pizz, pizz=True)
-
+    
+    create_spectral_matrix("Violin1", path_scales, n_notes=78, pizz=True)
+    create_spectral_matrix("Violin2", path_scales, n_notes=78, pizz=True)
+    create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
+    create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
+    create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
 
 if __name__ == "__main__":
     main()
