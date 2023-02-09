@@ -44,7 +44,9 @@ def extract_wav_instru_multiprocess(
     for name in all_mics:
         for file in raw_files:
             if isfile(join(path_prefix, file)) and (
-                name == file.rstrip(".wav").split(" ")[2]
+                # name == file.rstrip(".wav").split(" ")[2] # For non pizz
+                name
+                == file.rstrip(".wav").split(" ")[3]
             ):
                 wavefile_names.append(join(path_prefix, file))
     kwargs = {"sr": None}
@@ -74,25 +76,12 @@ def split_scale(
     # Initialize the array
     notes = np.zeros((nb_notes, window_width))
 
+    if len(wavefile) < start_sample + nb_notes * window_width:
+        tmp = np.zeros(start_sample + nb_notes * window_width + 1)
+        tmp[: len(wavefile)] = wavefile
+        wavefile = tmp
+    
     time_vec = np.linspace(0, len(wavefile) / sr, len(wavefile))
-
-    plt.subplot(221)
-    plt.plot(
-        time_vec[: start_sample + window_width + sr],
-        wavefile[: start_sample + window_width + sr],
-    )
-    plt.vlines(time_vec[start_sample], -1, 1, color="red")
-    plt.vlines(time_vec[start_sample + window_width], -1, 1, color="green")
-
-    plt.subplot(222)
-    plt.plot(
-        time_vec[start_sample + (nb_notes - 1) * window_width :],
-        wavefile[start_sample + (nb_notes - 1) * window_width :],
-    )
-    plt.vlines(
-        time_vec[start_sample + (nb_notes - 1) * window_width], -1, 1, color="red"
-    )
-    plt.vlines(time_vec[start_sample + nb_notes * window_width], -1, 1, color="green")
 
     plt.subplot(212)
     plt.plot(time_vec, wavefile)
@@ -104,6 +93,21 @@ def split_scale(
         stop = start_sample + (k + 1) * window_width
         notes[k] = wavefile[start:stop]
         plt.vlines(time_vec[stop], -1, 1, color="green")
+    plt.subplot(221)
+    plt.plot(
+        time_vec[: start_sample + window_width + sr],
+        wavefile[: start_sample + window_width + sr],
+    )
+    plt.vlines(time_vec[start_sample], -1, 1, color="red")
+    plt.vlines(time_vec[start_sample + window_width], -1, 1, color="green")
+
+    plt.subplot(222)
+    plt.plot(
+        time_vec[start:],
+        wavefile[start:],
+    )
+    plt.vlines(time_vec[start], -1, 1, color="red")
+    plt.vlines(time_vec[stop], -1, 1, color="green")
     plt.show()
     return notes
 
@@ -153,9 +157,26 @@ def extract_and_save_notes(
 def main():
     path_scales = "Sounds/Scales/"
 
-    param_cello = (0.7, 32, 65.5, 20)
+    # params_instru = (start_time, nb_notes, bpm, midi_pitch_start)
+    param_violin1 = (0.73, 39, 30.3, 55)
+    param_violin2 = (1.1, 24, 30.75, 57)
+    param_flute = (0, 36, 29.3, 60)
+    param_clarinet = (0.7, 40, 26, 50)
+    param_cello = (1.4, 32, 30, 36)
 
-    extract_and_save_notes(path_scales, "Cello", param_cello, pizz=False)
+    param_violin1_pizz = (0.73, 39, 30.3, 55)
+    param_violin2_pizz = (0, 24, 30.75, 57)
+    param_cello_pizz = (1, 32, 30, 36)
+
+    # extract_and_save_notes(path_scales, "Violin1", param_violin1, pizz=False)
+    # extract_and_save_notes(path_scales, "Violin2", param_violin2, pizz=False)
+    # extract_and_save_notes(path_scales, "Flute", param_flute, pizz=False)
+    # extract_and_save_notes(path_scales, "Clarinet", param_clarinet, pizz=False)
+    # extract_and_save_notes(path_scales, "Cello", param_cello, pizz=False)
+
+    # extract_and_save_notes(path_scales, "Violin1", param_violin1_pizz, pizz=True)
+    # extract_and_save_notes(path_scales, "Violin2", param_violin2_pizz, pizz=True)
+    # extract_and_save_notes(path_scales, "Cello", param_cello_pizz, pizz=True)
 
 
 if __name__ == "__main__":
