@@ -102,8 +102,8 @@ def init_GQ(
     try:
         ind = init_type_dict[init_type.upper()]
     except KeyError:
-        print("Wrong init type name, random is chosen by default")
-        ind = 0
+        print("Wrong init type name, circular is chosen by default")
+        ind = 2
     match ind:
         case 0:
             # Random init
@@ -774,6 +774,20 @@ def separate(
     return separated_spec_NFT
 
 
+def source_image():
+    """
+    Demix the multi-channel spectrogram of the sources
+
+    Input
+    -----
+    - image_NFTM: Array [N, F, T, M] = Separated spectrograms of N sources for M microphones
+
+    Output
+    ------
+    - source_NFT: Array [N, F, T] = Demixed spectrograms of the N sources
+    """
+
+
 def fast_MNMF2(
     X_FTM: ArrayLike,
     n_iter: int,
@@ -835,8 +849,16 @@ def fast_MNMF2(
             n_notes,
             n_activations,
         )
-        if E_NFL is None or P_NOT is None:
-            E_NFL, P_NOT = init_EP_split(
+        if E_NFL is None:
+            E_NFL, _ = init_EP_split(
+                n_sources,
+                n_freq_bins,
+                n_time_frames,
+                n_notes,
+                n_activations,
+            )
+        if P_NOT is None:
+            _, P_NOT = init_EP_split(
                 n_sources,
                 n_freq_bins,
                 n_time_frames,
@@ -863,7 +885,7 @@ def fast_MNMF2(
         XX_FTMM = init_IP(X_FTM)
 
     if show_progress:
-        loss = np.zeros(n_iter // 10 + 1)
+        likelihood = np.zeros(n_iter)
 
     Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
     PSD_NFT = calculate_PSD(W_NFK, H_NKT)
@@ -908,16 +930,14 @@ def fast_MNMF2(
                 algo,
                 norm_interval=10,
             )
-            if show_progress and (k % 10 == 0):
-                loss[k] = calculate_log_likelihood(
-                    updatable_params[2],
-                    updatable_params[3],
+            if show_progress:
+                # TODO: fix parameters
+                likelihood[k] = calculate_log_likelihood(
                     updatable_params[5],
                     updatable_params[6],
-                    E_inv_NLF,
-                    P_inv_NTO,
+                    updatable_params[3],
                 )
-                print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
+                print(f"Iteration {k+1}/{n_iter} - Loss: {likelihood[k]}", end="\r")
     else:
         for k in range(n_iter):
             updatable_params = update_all_params(
@@ -928,11 +948,15 @@ def fast_MNMF2(
                 algo,
                 norm_interval=10,
             )
-            if show_progress and (k % 10 == 0):
-                loss[k] = calculate_log_likelihood(
-                    updatable_params[5], updatable_params[6], updatable_params[3]
+            if show_progress:
+                likelihood[k] = calculate_log_likelihood(
+                    updatable_params[5],
+                    updatable_params[6],
+                    updatable_params[3],
                 )
-                print(f"Iteration {k+1}/{n_iter} - Loss: {loss[k]}")
+                print(
+                    f"Iteration {k+1}/{n_iter} - Likelihood: {likelihood[k]}", end="\r"
+                )
 
     ##################
     ### Separation ###
@@ -971,12 +995,41 @@ def fast_MNMF2(
             separated_spec[m] = separate(X_FTM, Q_FMM, PSD_NFT, G_tilde_NM, mic_index=m)
 
     if show_progress:
-        plt.plot(loss, label="Loss")
+        plt.plot(likelihood, label="Log Likelihood")
         plt.legend()
         plt.show()
 
     return separated_spec, *updatable_params
 
+
+def main():
+    # N, F, T, L, O = 4, 32, 10, 3, 5
+    # E, P = init_EP_split(N, F, T, L, O)
+    # E_inv, P_inv = inverse_EP(E, P)
+    # with np.printoptions(edgeitems=np.inf, linewidth=np.inf):
+    #     print(E_inv @ E)
+    #     print(P @ P_inv)
+
+    F, T, M = 1024, 100, 4
+    dummy_X = np.random.rand(F, T, M) * (1 + 1j)
+    separated_spec, *updatable_params = fast_MNMF2(
+        dummy_X,
+        n_iter=20,
+        n_sources=M - 1,
+        n_microphones=M,
+        n_time_frames=T,
+        n_freq_bins=F,
+        n_basis=32,
+        n_notes=24,
+        n_activations=10,
+        split=True,
+        show_progress=True,
+    )
+    return
+
+
+if __name__ == "__main__":
+    main()
 
 
 """
@@ -985,6 +1038,8 @@ FastMNMF2 from pyroomacoustics
 
 Blind Source Separation using Fast Multichannel Nonnegative Matrix Factorization 2 (FastMNMF2)
 """
+
+
 def fastmnmf2_pyroom(
     X,
     n_src=None,
@@ -1153,32 +1208,3 @@ def fastmnmf2_pyroom(
             Y_FTM = np.einsum("nft, nm -> ftm", lambda_NFT, g_NM) + eps
 
     return separate(), W_NFK, H_NKT, Y_FTM, g_NM, Q_FMM
-
-
-def main():
-    # N, F, T, L, O = 4, 32, 10, 3, 5
-    # E, P = init_EP_split(N, F, T, L, O)
-    # E_inv, P_inv = inverse_EP(E, P)
-    # with np.printoptions(edgeitems=np.inf, linewidth=np.inf):
-    #     print(E_inv @ E)
-    #     print(P @ P_inv)
-
-    F, T, M = 1024, 100, 4
-    dummy_X = np.random.rand(F, T, M) * (1 + 1j)
-    separated_spec, *updatable_params = fast_MNMF2(
-        dummy_X,
-        n_iter=10,
-        n_sources=M - 1,
-        n_microphones=M,
-        n_time_frames=T,
-        n_freq_bins=F,
-        n_basis=32,
-        n_notes=24,
-        n_activations=10,
-        split=True,
-    )
-    return
-
-
-if __name__ == "__main__":
-    main()
