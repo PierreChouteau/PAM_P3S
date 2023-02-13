@@ -519,7 +519,7 @@ def calculate_PSD(W_NFK: ArrayLike, H_NKT: ArrayLike):
     ------
     - PSD_NFT
     """
-    EPS = 1e-6
+    EPS = 1e-10
     return W_NFK @ H_NKT + EPS
 
 
@@ -535,7 +535,7 @@ def calculate_Y_tilde(G_tilde_NM: ArrayLike, PSD_NFT: ArrayLike):
     ------
     - Y_tilde_FTM:  Array [F, T, M] = Sum of (PSD_NFT x G_tilde_NM) over all sources
     """
-    EPS = 1e-6
+    EPS = 1e-10
     Y_tilde_FTM = np.einsum("nft, nm -> ftm", PSD_NFT, G_tilde_NM) + EPS
     return Y_tilde_FTM
 
