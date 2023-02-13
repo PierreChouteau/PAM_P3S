@@ -875,6 +875,7 @@ def fast_MNMF2(
             n_basis=n_basis,
             n_sources=n_sources,
         )
+    G_tilde_NM /= G_tilde_NM.sum(axis=1)[:, None]
     W_NFK, H_NKT, G_tilde_NM, Q_FMM = normalize(
         W_NFK,
         H_NKT,

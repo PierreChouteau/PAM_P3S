@@ -155,7 +155,7 @@ def extract_and_save_notes(
 
 
 def compute_spectro(data: np.ndarray, nfft: int):
-    return np.abs(np.fft.rfft(data, nfft))
+    return np.square(np.abs(np.fft.rfft(data, nfft)))
 
 
 def save_matrix(instrument: str, matrix: np.ndarray, path: str):
@@ -164,23 +164,28 @@ def save_matrix(instrument: str, matrix: np.ndarray, path: str):
         mkdir(save_path)
     filename = join(save_path, f"Matrix_{instrument}.npy")
     np.save(filename, matrix)
+    load_matrix(filename)
 
 
 def create_spectral_matrix(
-    instrument: str, path: str, n_notes: int, pizz: bool = False, nfft: int = 2048
+    instrument: str, path: str, n_notes: int, pizz: bool = False, nfft: int = 4096
 ):
     # n_notes is the max number of notes among the instruments.
     # If the current instrument has less notes, the matrix will be padded with zeros.
 
     path_notes = join(path, instrument, "Notes")
     files = [join(path_notes, file) for file in listdir(path_notes)]
+    files.sort()
 
     if pizz:
         path_pizz = join(path, instrument, "Pizz", "Notes")
-        files += [join(path_pizz, file) for file in listdir(path_pizz)]
+        files_pizz = [join(path_pizz, file) for file in listdir(path_pizz)]
+        files_pizz.sort()
+        files += files_pizz
 
     spectral_matrix = np.zeros((nfft // 2 + 1, n_notes))
-    for i, file in enumerate(files):
+    for i in range(n_notes):
+        file = files[i%len(files)]
         data, sr = sf.read(file)
         spectral_matrix[:, i] = compute_spectro(data, nfft)
     save_matrix(instrument, spectral_matrix, path)
@@ -188,7 +193,7 @@ def create_spectral_matrix(
 
 def load_matrix(filename: str):
     mat = np.load(filename)
-    plt.imshow(mat, aspect="auto", origin="lower")
+    plt.imshow(np.log(mat+1e-6), aspect="auto", origin="lower")
     plt.show()
     return mat
 
