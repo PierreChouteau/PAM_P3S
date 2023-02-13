@@ -45,9 +45,10 @@ def get_files(path_in, extension=".mp4"):
                 # file address
                 files_in.append(os.path.join(r, file))
                 # file author + song
-                files_title.append(file[:-9])
+                files_title.append(file[:-len(extension)])
 
     files_in.sort()
+    files_title.sort()
 
     return files_in, files_title
 
@@ -55,6 +56,7 @@ def get_files(path_in, extension=".mp4"):
 def room_sources_micro(
     audio_list,
     rate,
+    start_time,
     audio_length,
     room,
     source_locations,
@@ -123,7 +125,7 @@ def room_sources_micro(
 
     # Add sources
     for source, source_loc in zip(audio_list, source_locations):
-        signal_channel = librosa.core.to_mono(source[:, : rate * audio_length])
+        signal_channel = librosa.core.to_mono(source[:, start_time*rate: (start_time + audio_length) * rate])
         room.add_source(
             position=source_loc, directivity=source_dir, signal=signal_channel
         )
@@ -299,7 +301,7 @@ def shoebox_room(
     return room
 
 
-def compute_W(path, L=2048, pitch_min=21, pitch_max=109):
+def compute_W(path, instrument, L=2048, pitch_min=21, pitch_max=109):
     """
     This function computes the PSD of the instrument notes from an audio file
     and returns the matrix W, that correspond to the dictionary of the instrument.
@@ -343,7 +345,7 @@ def compute_W(path, L=2048, pitch_min=21, pitch_max=109):
     pitches = np.arange(pitch_min, pitch_max)
 
     for i, pitch in enumerate(pitches):
-        xt, samplerate = librosa.load(path + "{}.wav".format(str(int(pitch))), sr=None)
+        xt, samplerate = librosa.load(path + str(int(pitch)) + instrument + ".wav", sr=None)
         freqs, Pxx_den = sp.signal.welch(xt, nfft=L)
         notes.append(xt)
         notes_psd.append(Pxx_den)
@@ -352,7 +354,7 @@ def compute_W(path, L=2048, pitch_min=21, pitch_max=109):
 
     W_piano = notes_psd.T
 
-    return W_piano, notes, notes_psd, freqs
+    return W_piano, notes, notes_psd, freqs, samplerate
 
 
 def room_spectrogram_from_musdb(
