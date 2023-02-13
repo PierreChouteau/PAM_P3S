@@ -108,7 +108,7 @@ def init_GQ(
         case 0:
             # Random init
             G_tilde_NM = np.random.rand(n_sources, n_sensors)
-            Q_FMM = np.random.rand(n_FFT, n_sensors, n_sensors)
+            Q_FMM = np.random.rand(n_FFT, n_sensors, n_sensors, dtype=np.complex_)
         case 1:
             # Diagonal init
             G_tilde_NM = np.zeros((n_sources, n_sensors)) + G_eps
