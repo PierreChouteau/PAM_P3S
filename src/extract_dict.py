@@ -191,7 +191,7 @@ def create_spectral_matrix(
         spectral_matrix[:, i] = compute_spectro(data, nfft)
     for i in range(n_notes - len(files)):
         spectral_matrix[:, len(files) + i] = spectral_matrix[:, i]
-        spectral_matrix[: -i - 1, len(files) + i] = 0
+        spectral_matrix[-i - 1, len(files) + i :] = 0
     save_matrix(instrument, spectral_matrix, path)
 
 
