@@ -400,7 +400,8 @@ def room_spectrogram_from_musdb(
     """
     path = song_path
     data, rate = stempeg.read_stems(path)
-    channel_nb, time_step, _ = data.shape
+    channel_nb = room.n_mics
+
     X = []
 
     # Add sources
@@ -431,7 +432,7 @@ def room_spectrogram_from_musdb(
     win_s = pra.transform.stft.compute_synthesis_window(win_a, hop)
 
     # Observation vector in the STFT domain
-    for channel in range(channel_nb - 1):
+    for channel in range(channel_nb):
 
         Xn = pra.transform.stft.analysis(mics_signals[channel].T, L, hop, win=win_a)
         X.append(Xn)
@@ -439,7 +440,7 @@ def room_spectrogram_from_musdb(
     X = np.array(X)
 
     if display_audio:
-        for microphone_n in range(channel_nb - 1):
+        for microphone_n in range(channel_nb):
             display(ipd.Audio(mics_signals[microphone_n], rate=room.fs))
 
     return X, separate_recordings, mics_signals
