@@ -44,7 +44,8 @@ def extract_wav_instru_multiprocess(
     for name in all_mics:
         for file in raw_files:
             if isfile(join(path_prefix, file)) and (
-                name == file.rstrip(".wav").split(" ")[2] # For non pizz
+                name
+                == file.rstrip(".wav").split(" ")[2]  # For non pizz
                 # name
                 # == file.rstrip(".wav").split(" ")[3]
             ):
@@ -185,7 +186,7 @@ def create_spectral_matrix(
 
     spectral_matrix = np.zeros((nfft // 2 + 1, n_notes))
     for i in range(n_notes):
-        file = files[i%len(files)]
+        file = files[i % len(files)]
         data, sr = sf.read(file)
         spectral_matrix[:, i] = compute_spectro(data, nfft)
     save_matrix(instrument, spectral_matrix, path)
@@ -193,9 +194,24 @@ def create_spectral_matrix(
 
 def load_matrix(filename: str):
     mat = np.load(filename)
-    plt.imshow(np.log(mat+1e-6), aspect="auto", origin="lower")
+    plt.imshow(np.log(mat + 1e-6), aspect="auto", origin="lower")
     plt.show()
     return mat
+
+
+def modify_wav(filename: str, threshold_ratio: int, show: bool = False):
+    data, sr = sf.read(filename)
+    power = np.square(data)
+    threshold = threshold_ratio * np.max(power)
+    for i in range(len(power)):
+        if power[i] > threshold:
+            start = i
+            break
+    if show:
+        plt.plot(data)
+        plt.plot(np.arange(len(data))[start:], data[start:])
+        plt.show()
+    sf.write(filename, data[start:], sr)
 
 
 def main():
@@ -222,12 +238,30 @@ def main():
     # extract_and_save_notes(path_scales, "Violin2", param_violin2_pizz, pizz=True)
     # extract_and_save_notes(path_scales, "Cello", param_cello_pizz, pizz=True)
 
-    create_spectral_matrix("Violin1", path_scales, n_notes=78, pizz=True)
-    create_spectral_matrix("Violin2", path_scales, n_notes=78, pizz=True)
-    create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
-    create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
-    create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
+    # create_spectral_matrix("Violin1", path_scales, n_notes=78, pizz=True)
+    # create_spectral_matrix("Violin2", path_scales, n_notes=78, pizz=True)
+    # create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
+    # create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
+    # create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
     
+    path_notes_violin1 = join(path_scales, "Violin1", "Notes")
+    path_notes_violin1_pizz = join(path_scales, "Violin1", "Pizz", "Notes")
+    path_notes_violin2 = join(path_scales, "Violin2", "Notes")
+    path_notes_violin2_pizz = join(path_scales, "Violin2", "Pizz", "Notes")
+    path_notes_flute = join(path_scales, "Flute", "Notes")
+    path_notes_clarinet = join(path_scales, "Clarinet", "Notes")
+    path_notes_cello = join(path_scales, "Cello", "Notes")
 
+    files_violin1 = [join(path_notes_violin1, file) for file in listdir(path_notes_violin1)]
+    files_violin1_pizz = [join(path_notes_violin1_pizz, file) for file in listdir(path_notes_violin1_pizz)]
+    files_violin2 = [join(path_notes_violin2, file) for file in listdir(path_notes_violin2)]
+    files_violin2_pizz = [join(path_notes_violin2_pizz, file) for file in listdir(path_notes_violin2_pizz)]
+    files_flute = [join(path_notes_flute, file) for file in listdir(path_notes_flute)]
+    files_clarinet = [join(path_notes_clarinet, file) for file in listdir(path_notes_clarinet)]
+    files_cello = [join(path_notes_cello, file) for file in listdir(path_notes_cello)]
+
+    all_notes_files = files_violin1 + files_violin1_pizz + files_violin2 + files_violin2_pizz + files_flute + files_clarinet + files_cello
+    for file in all_notes_files:
+        modify_wav(file, 5e-3)
 if __name__ == "__main__":
     main()
