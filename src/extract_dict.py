@@ -185,10 +185,13 @@ def create_spectral_matrix(
         files += files_pizz
 
     spectral_matrix = np.zeros((nfft // 2 + 1, n_notes))
-    for i in range(n_notes):
-        file = files[i % len(files)]
+    for i in range(len(files)):
+        file = files[i]
         data, sr = sf.read(file)
         spectral_matrix[:, i] = compute_spectro(data, nfft)
+    for i in range(n_notes - len(files)):
+        spectral_matrix[:, len(files) + i] = spectral_matrix[:, i]
+        spectral_matrix[: -i - 1, len(files) + i] = 0
     save_matrix(instrument, spectral_matrix, path)
 
 
@@ -243,7 +246,7 @@ def main():
     # create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
     # create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
     # create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
-    
+
     path_notes_violin1 = join(path_scales, "Violin1", "Notes")
     path_notes_violin1_pizz = join(path_scales, "Violin1", "Pizz", "Notes")
     path_notes_violin2 = join(path_scales, "Violin2", "Notes")
@@ -252,16 +255,36 @@ def main():
     path_notes_clarinet = join(path_scales, "Clarinet", "Notes")
     path_notes_cello = join(path_scales, "Cello", "Notes")
 
-    files_violin1 = [join(path_notes_violin1, file) for file in listdir(path_notes_violin1)]
-    files_violin1_pizz = [join(path_notes_violin1_pizz, file) for file in listdir(path_notes_violin1_pizz)]
-    files_violin2 = [join(path_notes_violin2, file) for file in listdir(path_notes_violin2)]
-    files_violin2_pizz = [join(path_notes_violin2_pizz, file) for file in listdir(path_notes_violin2_pizz)]
+    files_violin1 = [
+        join(path_notes_violin1, file) for file in listdir(path_notes_violin1)
+    ]
+    files_violin1_pizz = [
+        join(path_notes_violin1_pizz, file) for file in listdir(path_notes_violin1_pizz)
+    ]
+    files_violin2 = [
+        join(path_notes_violin2, file) for file in listdir(path_notes_violin2)
+    ]
+    files_violin2_pizz = [
+        join(path_notes_violin2_pizz, file) for file in listdir(path_notes_violin2_pizz)
+    ]
     files_flute = [join(path_notes_flute, file) for file in listdir(path_notes_flute)]
-    files_clarinet = [join(path_notes_clarinet, file) for file in listdir(path_notes_clarinet)]
+    files_clarinet = [
+        join(path_notes_clarinet, file) for file in listdir(path_notes_clarinet)
+    ]
     files_cello = [join(path_notes_cello, file) for file in listdir(path_notes_cello)]
 
-    all_notes_files = files_violin1 + files_violin1_pizz + files_violin2 + files_violin2_pizz + files_flute + files_clarinet + files_cello
+    all_notes_files = (
+        files_violin1
+        + files_violin1_pizz
+        + files_violin2
+        + files_violin2_pizz
+        + files_flute
+        + files_clarinet
+        + files_cello
+    )
     for file in all_notes_files:
         modify_wav(file, 5e-3)
+
+
 if __name__ == "__main__":
     main()
