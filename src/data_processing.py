@@ -367,6 +367,7 @@ def room_spectrogram_from_musdb(
     hop=512,
     rate=44100,
     display_audio=False,
+    display_room=False
 ):
 
     """
@@ -387,6 +388,7 @@ def room_spectrogram_from_musdb(
     - hop:                  optionnal, int                      = hop length (512 default)
     - rate:                 optionnal, int                      = signal rate (44100 default)
     - display_audio:        optionnal, bool                     = audio display (False default)
+    - display_room:         optionnal, bool                     = room display (False default)
 
     Output
     ---
@@ -409,6 +411,16 @@ def room_spectrogram_from_musdb(
         room.add_source(
             position=source_loc, directivity=source_dir, signal=signal_channel
         )
+
+    if display_room:
+        fig, ax = room.plot()
+        lim = 9
+        ax.set_xlim([0, lim])
+        ax.set_ylim([0, lim])
+        ax.set_zlim([0, lim])
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
 
     # Recordings
     separate_recordings = room.simulate(return_premix=True)
