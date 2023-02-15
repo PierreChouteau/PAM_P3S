@@ -191,7 +191,7 @@ def create_spectral_matrix(
         spectral_matrix[:, i] = compute_spectro(data, nfft)
     for i in range(n_notes - len(files)):
         spectral_matrix[:, len(files) + i] = spectral_matrix[:, i]
-        spectral_matrix[-i - 1, len(files) + i :] = 0
+        spectral_matrix[10*(-i - 1):, len(files) + i :] = 0
     save_matrix(instrument, spectral_matrix, path)
 
 
@@ -241,49 +241,49 @@ def main():
     # extract_and_save_notes(path_scales, "Violin2", param_violin2_pizz, pizz=True)
     # extract_and_save_notes(path_scales, "Cello", param_cello_pizz, pizz=True)
 
-    # create_spectral_matrix("Violin1", path_scales, n_notes=78, pizz=True)
-    # create_spectral_matrix("Violin2", path_scales, n_notes=78, pizz=True)
-    # create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
-    # create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
-    # create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
+    create_spectral_matrix("Violin1", path_scales, n_notes=78, pizz=True)
+    create_spectral_matrix("Violin2", path_scales, n_notes=78, pizz=True)
+    create_spectral_matrix("Flute", path_scales, n_notes=78, pizz=False)
+    create_spectral_matrix("Clarinet", path_scales, n_notes=78, pizz=False)
+    create_spectral_matrix("Cello", path_scales, n_notes=78, pizz=True)
 
-    path_notes_violin1 = join(path_scales, "Violin1", "Notes")
-    path_notes_violin1_pizz = join(path_scales, "Violin1", "Pizz", "Notes")
-    path_notes_violin2 = join(path_scales, "Violin2", "Notes")
-    path_notes_violin2_pizz = join(path_scales, "Violin2", "Pizz", "Notes")
-    path_notes_flute = join(path_scales, "Flute", "Notes")
-    path_notes_clarinet = join(path_scales, "Clarinet", "Notes")
-    path_notes_cello = join(path_scales, "Cello", "Notes")
+    # path_notes_violin1 = join(path_scales, "Violin1", "Notes")
+    # path_notes_violin1_pizz = join(path_scales, "Violin1", "Pizz", "Notes")
+    # path_notes_violin2 = join(path_scales, "Violin2", "Notes")
+    # path_notes_violin2_pizz = join(path_scales, "Violin2", "Pizz", "Notes")
+    # path_notes_flute = join(path_scales, "Flute", "Notes")
+    # path_notes_clarinet = join(path_scales, "Clarinet", "Notes")
+    # path_notes_cello = join(path_scales, "Cello", "Notes")
 
-    files_violin1 = [
-        join(path_notes_violin1, file) for file in listdir(path_notes_violin1)
-    ]
-    files_violin1_pizz = [
-        join(path_notes_violin1_pizz, file) for file in listdir(path_notes_violin1_pizz)
-    ]
-    files_violin2 = [
-        join(path_notes_violin2, file) for file in listdir(path_notes_violin2)
-    ]
-    files_violin2_pizz = [
-        join(path_notes_violin2_pizz, file) for file in listdir(path_notes_violin2_pizz)
-    ]
-    files_flute = [join(path_notes_flute, file) for file in listdir(path_notes_flute)]
-    files_clarinet = [
-        join(path_notes_clarinet, file) for file in listdir(path_notes_clarinet)
-    ]
-    files_cello = [join(path_notes_cello, file) for file in listdir(path_notes_cello)]
+    # files_violin1 = [
+    #     join(path_notes_violin1, file) for file in listdir(path_notes_violin1)
+    # ]
+    # files_violin1_pizz = [
+    #     join(path_notes_violin1_pizz, file) for file in listdir(path_notes_violin1_pizz)
+    # ]
+    # files_violin2 = [
+    #     join(path_notes_violin2, file) for file in listdir(path_notes_violin2)
+    # ]
+    # files_violin2_pizz = [
+    #     join(path_notes_violin2_pizz, file) for file in listdir(path_notes_violin2_pizz)
+    # ]
+    # files_flute = [join(path_notes_flute, file) for file in listdir(path_notes_flute)]
+    # files_clarinet = [
+    #     join(path_notes_clarinet, file) for file in listdir(path_notes_clarinet)
+    # ]
+    # files_cello = [join(path_notes_cello, file) for file in listdir(path_notes_cello)]
 
-    all_notes_files = (
-        files_violin1
-        + files_violin1_pizz
-        + files_violin2
-        + files_violin2_pizz
-        + files_flute
-        + files_clarinet
-        + files_cello
-    )
-    for file in all_notes_files:
-        modify_wav(file, 5e-3)
+    # all_notes_files = (
+    #     files_violin1
+    #     + files_violin1_pizz
+    #     + files_violin2
+    #     + files_violin2_pizz
+    #     + files_flute
+    #     + files_clarinet
+    #     + files_cello
+    # )
+    # for file in all_notes_files:
+    #     modify_wav(file, 5e-3)
 
 
 if __name__ == "__main__":
