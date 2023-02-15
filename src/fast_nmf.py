@@ -392,7 +392,7 @@ def update_W_split(
 
     U_new_NLK = np.einsum(
         "nlf, nfk -> nlk", E_inv_NLF, (W_old_NFK * np.sqrt(numerator / denominator))
-    )
+    )    
     return U_new_NLK
 
 
@@ -1246,9 +1246,10 @@ def fastmnmf2(
             Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
             Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
 
-        print('W_NFK:', np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
-        print('H_NKT:', np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
-        print('Q_FMM:', np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
+        print('iter:', epoch)
+        # print('W_NFK:', np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
+        # print('H_NKT:', np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
+        # print('Q_FMM:', np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
                                 
                                 
     # separated_spec = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index)
@@ -1346,6 +1347,16 @@ def fastmnmf2_split(
     W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
     H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
     
+    W_NFK, U_NLK, H_NKT, T_NKO, g_NM, Q_FMM = normalize_split(
+                                                        W_NFK,
+                                                        E_inv_NLF,
+                                                        U_NLK,
+                                                        H_NKT,
+                                                        P_inv_NTO,
+                                                        T_NKO,
+                                                        g_NM,
+                                                        Q_FMM,)
+    
     lambda_NFT = W_NFK @ H_NKT
     Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
     Y_FTM = np.einsum("nft, nm -> ftm", lambda_NFT, g_NM)
@@ -1353,17 +1364,26 @@ def fastmnmf2_split(
     # update parameters
     for epoch in range(n_iter):
         H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
-        U_NLK = update_W_split(
-                E_NFL,
-                U_NLK,
-                E_inv_NLF,
-                g_NM,
-                Qx_power_FTM,
-                Y_FTM,
-                H_NKT,
-            )
+        # U_NLK = update_W_split(
+        #         E_NFL,
+        #         U_NLK,
+        #         E_inv_NLF,
+        #         g_NM,
+        #         Qx_power_FTM,
+        #         Y_FTM,
+        #         H_NKT,
+        #     )
         
-        W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+        # W_NFK = update_W(
+        #             W_NFK,
+        #             g_NM,
+        #             Qx_power_FTM,
+        #             Y_FTM,
+        #             H_NKT,
+        #         )
+                
+        # W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+        
         lambda_NFT = calculate_PSD(W_NFK, H_NKT)
         Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
         
@@ -1410,8 +1430,7 @@ def fastmnmf2_split(
                                                         P_inv_NTO,
                                                         T_NKO,
                                                         g_NM,
-                                                        Q_FMM,
-                                                        )
+                                                        Q_FMM,)
 
     
             lambda_NFT = calculate_PSD(W_NFK, H_NKT)
