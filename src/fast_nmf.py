@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 
 try:
     import cupy as np
+
     print("Using GPU")
 except ImportError:
     import numpy as np
@@ -68,7 +69,7 @@ def normalize_split(
     nu_NK = W_NFK.sum(axis=1)
     W_NFK /= nu_NK[:, None]
     H_NKT *= nu_NK[:, :, None]
-    
+
     U_NLK = np.einsum("nlf, nfk -> nlk", E_inv_NLF, W_NFK)
     T_NKO = np.einsum("nkt, nto -> nko", H_NKT, P_inv_NTO)
 
@@ -105,8 +106,8 @@ def init_GQ(
     n_FFT,
     n_sources,
     n_sensors,
-    G_tilde_NM = None,
-    Q_FMM = None,
+    G_tilde_NM=None,
+    Q_FMM=None,
 ):
     """Initialize FastMNMF2 parameters.
 
@@ -149,18 +150,18 @@ def init_GQ(
             for n in range(min(n_sources, n_sensors)):
                 G_tilde_NM[n, n] = 1
         case 2:
-            print('V16 Circular init')
+            print("V16 Circular init")
             # Circular init
             G_tilde_NM = np.ones([n_sources, n_sensors], dtype=np.float32) * G_eps
             Q_FMM = np.tile(np.eye(n_sensors, dtype=np.complex64), [n_FFT, 1, 1])
 
             for m in range(n_sensors):
                 G_tilde_NM[m % n_sources, m] = 1
-                
+
             for m in range(n_sensors):
                 mu_F = (Q_FMM[:, m] * Q_FMM[:, m].conj()).sum(axis=1).real
                 Q_FMM[:, m] /= np.sqrt(mu_F[:, None])
-                
+
         case 3:
             # Gradual init
             if (G_tilde_NM, Q_FMM) == (None, None):
@@ -312,12 +313,11 @@ def update_WH(
     numerator = np.einsum("nkt, nft -> nfk", H_NKT, tmp1_NFT)
     denominator = np.einsum("nkt, nft -> nfk", H_NKT, tmp2_NFT)
     W_NFK *= np.sqrt(numerator / denominator)
-    
-    
+
     numerator = np.einsum("nfk, nft -> nkt", W_NFK, tmp1_NFT)
     denominator = np.einsum("nfk, nft -> nkt", W_NFK, tmp2_NFT)
     H_NKT *= np.sqrt(numerator / denominator)
-    
+
     return W_NFK, H_NKT
 
 
@@ -392,7 +392,7 @@ def update_W_split(
 
     U_new_NLK = np.einsum(
         "nlf, nfk -> nlk", E_inv_NLF, (W_old_NFK * np.sqrt(numerator / denominator))
-    )    
+    )
     return U_new_NLK
 
 
@@ -429,13 +429,13 @@ def update_H(
 
 
 def update_H_split(
-    T_old_NKO ,
-    P_NOT ,
-    P_inv_NTO ,
-    G_tilde_NM ,
-    X_tilde_FTM ,
-    Y_tilde_FTM ,
-    W_NFK ,
+    T_old_NKO,
+    P_NOT,
+    P_inv_NTO,
+    G_tilde_NM,
+    X_tilde_FTM,
+    Y_tilde_FTM,
+    W_NFK,
 ):
     """Update H as the product T @ P with P fixed and T updated.
 
@@ -473,10 +473,10 @@ def update_H_split(
 
 
 def update_G(
-    G_tilde_NM ,
-    PSD_NFT ,
-    X_tilde_FTM ,
-    Y_tilde_FTM ,
+    G_tilde_NM,
+    PSD_NFT,
+    X_tilde_FTM,
+    Y_tilde_FTM,
 ):
     """Update G_tilde. Eq 36
 
@@ -532,9 +532,9 @@ def update_Q_IP(
 
 
 def update_Q_ISS(
-    Q_old_FMM ,
-    Qx_FTM ,
-    Y_tilde_FTM ,
+    Q_old_FMM,
+    Qx_FTM,
+    Y_tilde_FTM,
 ):
     """Update Q_FMM. Eq25
 
@@ -562,7 +562,7 @@ def update_Q_ISS(
     return Q_new_FMM, Qx_new_FTM
 
 
-def calculate_X_tilde(X_FTM , Q_FMM ):
+def calculate_X_tilde(X_FTM, Q_FMM):
     """Calculate X_tilde_FTM. Eq31
 
     Input
@@ -582,7 +582,7 @@ def calculate_X_tilde(X_FTM , Q_FMM ):
     return Qx_FTM, X_tilde_FTM
 
 
-def calculate_PSD(W_NFK , H_NKT ):
+def calculate_PSD(W_NFK, H_NKT):
     """Calculate PSD. NMF result
 
     Input
@@ -598,7 +598,7 @@ def calculate_PSD(W_NFK , H_NKT ):
     return W_NFK @ H_NKT + EPS
 
 
-def calculate_Y_tilde(G_tilde_NM , PSD_NFT ):
+def calculate_Y_tilde(G_tilde_NM, PSD_NFT):
     """Calculate Y_tilde_FTM. Eq31
 
     Input
@@ -616,9 +616,9 @@ def calculate_Y_tilde(G_tilde_NM , PSD_NFT ):
 
 
 def calculate_log_likelihood(
-    X_tilde_FTM ,
-    Y_tilde_FTM ,
-    Q_FMM ,
+    X_tilde_FTM,
+    Y_tilde_FTM,
+    Q_FMM,
 ):
     """This function computes the log likelihood of FastMNMF2
 
@@ -642,19 +642,19 @@ def calculate_log_likelihood(
 
 
 def update_all_params(
-    X_FTM ,
-    W_NFK ,
-    H_NKT ,
-    G_tilde_NM ,
-    Q_FMM ,
-    Qx_FTM ,
-    X_tilde_FTM ,
-    Y_tilde_FTM ,
-    XX_FTMM ,
-    index_iteration  ,
-    algo    = "IP",
-    Q_interval   = 1,
-    norm_interval   = 10,
+    X_FTM,
+    W_NFK,
+    H_NKT,
+    G_tilde_NM,
+    Q_FMM,
+    Qx_FTM,
+    X_tilde_FTM,
+    Y_tilde_FTM,
+    XX_FTMM,
+    index_iteration,
+    algo="IP",
+    Q_interval=1,
+    norm_interval=10,
 ):
     """Update all parameters in the correct order
 
@@ -694,9 +694,9 @@ def update_all_params(
                 XX_FTMM,
                 Y_tilde_FTM,
             )
-        
+
     Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
-    
+
     if (norm_interval <= 0) or (index_iteration % norm_interval == 0):
         W_NFK, H_NKT, G_tilde_NM, Q_FMM = normalize(
             W_NFK,
@@ -709,27 +709,27 @@ def update_all_params(
         Y_tilde_FTM = calculate_Y_tilde(G_tilde_NM, PSD_NFT)
 
     else:
-        Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)  
+        Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
     return W_NFK, H_NKT, G_tilde_NM, Q_FMM, Qx_FTM, X_tilde_FTM, Y_tilde_FTM
 
 
 def update_all_params_split(
-    X_FTM ,
-    U_NLK ,
-    T_NKO ,
-    G_tilde_NM ,
-    Q_FMM ,
-    Qx_FTM ,
-    X_tilde_FTM ,
-    Y_tilde_FTM ,
-    XX_FTMM ,
-    E_NFL ,
-    E_inv_NLF ,
-    P_NOT ,
-    P_inv_NTO ,
-    index_iteration  ,
-    algo    = "IP",
-    norm_interval   = 10,
+    X_FTM,
+    U_NLK,
+    T_NKO,
+    G_tilde_NM,
+    Q_FMM,
+    Qx_FTM,
+    X_tilde_FTM,
+    Y_tilde_FTM,
+    XX_FTMM,
+    E_NFL,
+    E_inv_NLF,
+    P_NOT,
+    P_inv_NTO,
+    index_iteration,
+    algo="IP",
+    norm_interval=10,
 ):
     """Update all parameters in the correct order with W and H split
 
@@ -800,11 +800,11 @@ def update_all_params_split(
 
 
 def separate(
-    X_FTM ,
-    Q_FMM ,
-    PSD_NFT ,
-    G_tilde_NM ,
-    mic_index  ,
+    X_FTM,
+    Q_FMM,
+    PSD_NFT,
+    G_tilde_NM,
+    mic_index,
 ):
     """
     Return the separated spectrograms for the specified microphone
@@ -828,9 +828,9 @@ def separate(
     Y_tilde_FTM = Y_NFTM.sum(axis=0)
 
     separated_spec_NFT = np.einsum(
-        "fj, ftj, nftj -> nft", 
-        Qinv_FMM[:, mic_index], 
-        Qx_FTM / Y_tilde_FTM, 
+        "fj, ftj, nftj -> nft",
+        Qinv_FMM[:, mic_index],
+        Qx_FTM / Y_tilde_FTM,
         Y_NFTM,
     )
     return separated_spec_NFT
@@ -841,21 +841,21 @@ def separate(
 #              lambda_NFT,
 #              g_NM,
 #              mic_index):
-    
+
 #         Qx_FTM = np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)
 #         Qinv_FMM = np.linalg.inv(Q_FMM)
 #         Y_NFTM = np.einsum("nft, nm -> nftm", lambda_NFT, g_NM)
 
-        # if mic_index == "all":
-        #     return np.einsum(
-        #         "fij, ftj, nftj -> itfn", Qinv_FMM, Qx_FTM / Y_NFTM.sum(axis=0), Y_NFTM
-        #     )
-        # elif type(mic_index) is int:
-        #     return np.einsum(
-        #         "fj, ftj, nftj -> tfn",
-        #         Qinv_FMM[:, mic_index],
-        #         Qx_FTM / Y_NFTM.sum(axis=0),
-        #         Y_NFTM,
+# if mic_index == "all":
+#     return np.einsum(
+#         "fij, ftj, nftj -> itfn", Qinv_FMM, Qx_FTM / Y_NFTM.sum(axis=0), Y_NFTM
+#     )
+# elif type(mic_index) is int:
+#     return np.einsum(
+#         "fj, ftj, nftj -> tfn",
+#         Qinv_FMM[:, mic_index],
+#         Qx_FTM / Y_NFTM.sum(axis=0),
+#         Y_NFTM,
 #             )
 #         else:
 #             raise ValueError("mic_index should be int or 'all'")
@@ -876,22 +876,22 @@ def source_image():
 
 
 def fast_MNMF2_old(
-    X_FTM ,
-    n_iter  ,
-    n_microphones  ,
-    n_sources  ,
-    n_time_frames  ,
-    n_freq_bins  ,
-    n_basis  ,
-    n_notes   = 24,
-    n_activations   = 30,
-    E_NFL  = None,
-    P_NOT  = None,
-    init    = "circular",
-    algo    = "IP",
-    split    = False,
-    mic_index   = None,
-    show_progress    = False,
+    X_FTM,
+    n_iter,
+    n_microphones,
+    n_sources,
+    n_time_frames,
+    n_freq_bins,
+    n_basis,
+    n_notes=24,
+    n_activations=30,
+    E_NFL=None,
+    P_NOT=None,
+    init="circular",
+    algo="IP",
+    split=False,
+    mic_index=None,
+    show_progress=False,
 ):
     """Main function of FastMNMF2
 
@@ -955,7 +955,7 @@ def fast_MNMF2_old(
         W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
         H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
     else:
-        print('pas split')
+        print("pas split")
         W_NFK, H_NKT = init_WH(
             n_FFT=n_freq_bins,
             n_time_frames=n_time_frames,
@@ -963,7 +963,7 @@ def fast_MNMF2_old(
             n_sources=n_sources,
         )
     if algo == "IP":
-        print('algo IP')
+        print("algo IP")
         XX_FTMM = init_IP(X_FTM)
 
     if show_progress:
@@ -972,14 +972,13 @@ def fast_MNMF2_old(
     PSD_NFT = W_NFK @ H_NKT
     Qx_FTM, X_tilde_FTM = calculate_X_tilde(X_FTM, Q_FMM)
     Y_tilde_FTM = np.einsum("nft, nm -> ftm", PSD_NFT, G_tilde_NM)
-    
+
     #################
     ### Main Loop ###
     #################
 
-        
     if split:
-        
+
         updatable_params = (
             U_NLK,
             T_NKO,
@@ -989,7 +988,6 @@ def fast_MNMF2_old(
             X_tilde_FTM,
             Y_tilde_FTM,
         )
-
 
     if split:
         for k in range(n_iter):
@@ -1005,7 +1003,7 @@ def fast_MNMF2_old(
                 algo,
                 norm_interval=10,
             )
-            
+
             if show_progress:
                 # TODO: fix parameters
                 likelihood[k] = calculate_log_likelihood(
@@ -1014,10 +1012,10 @@ def fast_MNMF2_old(
                     updatable_params[3],
                 )
                 print(f"Iteration {k+1}/{n_iter} - Loss: {likelihood[k]}", end="\r")
-                
+
     else:
-        print('pas split')
-        
+        print("pas split")
+
         updatable_params = (
             W_NFK,
             H_NKT,
@@ -1027,7 +1025,7 @@ def fast_MNMF2_old(
             X_tilde_FTM,
             Y_tilde_FTM,
         )
-        
+
         for k in range(n_iter):
             updatable_params = update_all_params(
                 X_FTM,
@@ -1038,7 +1036,7 @@ def fast_MNMF2_old(
                 Q_interval=1,
                 norm_interval=10,
             )
-            
+
             (
                 W_NFK,
                 H_NKT,
@@ -1048,15 +1046,13 @@ def fast_MNMF2_old(
                 X_tilde_FTM,
                 Y_tilde_FTM,
             ) = updatable_params
-            
-            print(
-                    f"Iteration {k+1}/{n_iter}"
-            )
-            
-            print('W_NFK:', np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
-            print('H_NKT:', np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
-            print('Q_FMM:', np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
-            
+
+            print(f"Iteration {k+1}/{n_iter}")
+
+            print("W_NFK:", np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
+            print("H_NKT:", np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
+            print("Q_FMM:", np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
+
             if show_progress:
                 likelihood[k] = calculate_log_likelihood(
                     updatable_params[5],
@@ -1081,7 +1077,7 @@ def fast_MNMF2_old(
             Y_tilde_FTM,
         ) = updatable_params
     else:
-        print('pas split')
+        print("pas split")
         (
             W_NFK,
             H_NKT,
@@ -1164,7 +1160,7 @@ def fastmnmf2(
     mic_index or 'all', optional
         The index of microphone of which you want to get the source image (default 0).
         If 'all', return the source images of all microphones
-        
+
     Returns
     -------
     If mic_index is int, returns an (nframes, nfrequencies, nsources) array.
@@ -1180,28 +1176,27 @@ def fastmnmf2(
     if n_src is None:
         n_src = X_FTM.shape[2]
 
-        
     g_NM, Q_FMM = init_GQ(
-        init_type='circular',
+        init_type="circular",
         n_FFT=n_freq,
         n_sources=n_src,
         n_sensors=n_chan,
     )
 
     W_NFK, H_NKT = init_WH(
-            n_FFT=n_freq,
-            n_time_frames=n_frames,
-            n_basis=n_components,
-            n_sources=n_src,
-        )
-    
+        n_FFT=n_freq,
+        n_time_frames=n_frames,
+        n_basis=n_components,
+        n_sources=n_src,
+    )
+
     lambda_NFT = W_NFK @ H_NKT
     Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
     Y_FTM = np.einsum("nft, nm -> ftm", lambda_NFT, g_NM)
 
     # update parameters
     for epoch in range(n_iter):
-        
+
         # update W and H (basis and activation of NMF)
         W_NFK, H_NKT = update_WH(
             W_NFK,
@@ -1213,7 +1208,7 @@ def fastmnmf2(
 
         lambda_NFT = calculate_PSD(W_NFK, H_NKT)
         Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
-        
+
         # update g_NM (diagonal element of spatial covariance matrices)
         g_NM = update_G(
             g_NM,
@@ -1230,43 +1225,33 @@ def fastmnmf2(
                 XX_FTMM,
                 Y_FTM,
             )
-        
+
         Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
-        
+
         # normalize
         if (interval_normalize <= 0) or (epoch % interval_normalize == 0):
-            
-            W_NFK, H_NKT, g_NM, Q_FMM = normalize(
-                                                W_NFK,
-                                                H_NKT,
-                                                g_NM,
-                                                Q_FMM)
-    
+
+            W_NFK, H_NKT, g_NM, Q_FMM = normalize(W_NFK, H_NKT, g_NM, Q_FMM)
+
             lambda_NFT = calculate_PSD(W_NFK, H_NKT)
             Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
             Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
 
-        print('iter:', epoch)
+        print("iter:", epoch)
         # print('W_NFK:', np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
         # print('H_NKT:', np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
         # print('Q_FMM:', np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
-                                
-                                
+
     # separated_spec = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index)
     if type(mic_index) is int:
-        separated_spec = separate(
-            X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=mic_index
-        )
+        separated_spec = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=mic_index)
 
     else:
-        separated_spec = np.zeros(
-            (n_chan, n_src, n_freq, n_frames), dtype=np.complex64
-        )
+        separated_spec = np.zeros((n_chan, n_src, n_freq, n_frames), dtype=np.complex64)
         for m in range(n_chan):
             separated_spec[m] = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=m)
-            
-    return separated_spec, W_NFK, H_NKT, Y_FTM, g_NM, Q_FMM
 
+    return separated_spec, W_NFK, H_NKT, Y_FTM, g_NM, Q_FMM
 
 
 def fastmnmf2_split(
@@ -1279,6 +1264,8 @@ def fastmnmf2_split(
     n_notes=None,
     n_activations=None,
     mic_index=0,
+    W_NFK=None,
+    n_iter_freeze_W=np.inf,
 ):
     """
 
@@ -1313,20 +1300,19 @@ def fastmnmf2_split(
     if n_src is None:
         n_src = X_FTM.shape[2]
 
-        
     g_NM, Q_FMM = init_GQ(
-        init_type='circular',
+        init_type="circular",
         n_FFT=n_freq,
         n_sources=n_src,
         n_sensors=n_chan,
     )
 
     U_NLK, T_NKO = init_UT_split(
-            n_src,
-            n_components,
-            n_notes,
-            n_activations,
-        )
+        n_src,
+        n_components,
+        n_notes,
+        n_activations,
+    )
     if E_NFL is None:
         E_NFL, _ = init_EP_split(
             n_src,
@@ -1344,19 +1330,22 @@ def fastmnmf2_split(
             n_activations,
         )
     E_inv_NLF, P_inv_NTO = inverse_EP(E_NFL, P_NOT)
-    W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+    if W_NFK is None:
+        W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
+
     H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
-    
+
     W_NFK, U_NLK, H_NKT, T_NKO, g_NM, Q_FMM = normalize_split(
-                                                        W_NFK,
-                                                        E_inv_NLF,
-                                                        U_NLK,
-                                                        H_NKT,
-                                                        P_inv_NTO,
-                                                        T_NKO,
-                                                        g_NM,
-                                                        Q_FMM,)
-    
+        W_NFK,
+        E_inv_NLF,
+        U_NLK,
+        H_NKT,
+        P_inv_NTO,
+        T_NKO,
+        g_NM,
+        Q_FMM,
+    )
+
     lambda_NFT = W_NFK @ H_NKT
     Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
     Y_FTM = np.einsum("nft, nm -> ftm", lambda_NFT, g_NM)
@@ -1373,33 +1362,33 @@ def fastmnmf2_split(
         #         Y_FTM,
         #         H_NKT,
         #     )
-        
-        # W_NFK = update_W(
-        #             W_NFK,
-        #             g_NM,
-        #             Qx_power_FTM,
-        #             Y_FTM,
-        #             H_NKT,
-        #         )
-                
+        if epoch > n_iter_freeze_W:
+            W_NFK = update_W(
+                        W_NFK,
+                        g_NM,
+                        Qx_power_FTM,
+                        Y_FTM,
+                        H_NKT,
+                    )
+
         # W_NFK = np.einsum("nfl, nlk -> nfk", E_NFL, U_NLK)
-        
+
         lambda_NFT = calculate_PSD(W_NFK, H_NKT)
         Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
-        
+
         T_NKO = update_H_split(
-                    T_NKO,
-                    P_NOT,
-                    P_inv_NTO,
-                    g_NM,
-                    Qx_power_FTM,
-                    Y_FTM,
-                    W_NFK,
-                )
+            T_NKO,
+            P_NOT,
+            P_inv_NTO,
+            g_NM,
+            Qx_power_FTM,
+            Y_FTM,
+            W_NFK,
+        )
         H_NKT = np.einsum("nko, not -> nkt", T_NKO, P_NOT)
         lambda_NFT = calculate_PSD(W_NFK, H_NKT)
         Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
-        
+
         # update g_NM (diagonal element of spatial covariance matrices)
         g_NM = update_G(
             g_NM,
@@ -1416,43 +1405,38 @@ def fastmnmf2_split(
                 XX_FTMM,
                 Y_FTM,
             )
-        
+
         Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
-        
+
         # normalize
         if (interval_normalize <= 0) or (epoch % interval_normalize == 0):
-            
-            W_NFK, U_NLK, H_NKT, T_NKO, g_NM, Q_FMM = normalize_split(
-                                                        W_NFK,
-                                                        E_inv_NLF,
-                                                        U_NLK,
-                                                        H_NKT,
-                                                        P_inv_NTO,
-                                                        T_NKO,
-                                                        g_NM,
-                                                        Q_FMM,)
 
-    
+            W_NFK, U_NLK, H_NKT, T_NKO, g_NM, Q_FMM = normalize_split(
+                W_NFK,
+                E_inv_NLF,
+                U_NLK,
+                H_NKT,
+                P_inv_NTO,
+                T_NKO,
+                g_NM,
+                Q_FMM,
+            )
+
             lambda_NFT = calculate_PSD(W_NFK, H_NKT)
             Qx_power_FTM = np.abs(np.einsum("fij, ftj -> fti", Q_FMM, X_FTM)) ** 2
             Y_FTM = calculate_Y_tilde(g_NM, lambda_NFT)
-            
-        print('itération:', epoch)
-        print('W_NFK:', np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
-        print('H_NKT:', np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
-        print('Q_FMM:', np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
-                                
+
+        print("itération:", epoch)
+        print("W_NFK:", np.min(W_NFK), np.max(W_NFK), np.mean(W_NFK))
+        print("H_NKT:", np.min(H_NKT), np.max(H_NKT), np.mean(H_NKT))
+        print("Q_FMM:", np.min(Q_FMM), np.max(Q_FMM), np.mean(Q_FMM))
+
     if type(mic_index) is int:
-        separated_spec = separate(
-            X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=mic_index
-        )
+        separated_spec = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=mic_index)
 
     else:
-        separated_spec = np.zeros(
-            (n_chan, n_src, n_freq, n_frames), dtype=np.complex64
-        )
+        separated_spec = np.zeros((n_chan, n_src, n_freq, n_frames), dtype=np.complex64)
         for m in range(n_chan):
             separated_spec[m] = separate(X_FTM, Q_FMM, lambda_NFT, g_NM, mic_index=m)
-            
 
     return separated_spec, W_NFK, E_NFL, U_NLK, H_NKT, Y_FTM, T_NKO, P_NOT, g_NM, Q_FMM
