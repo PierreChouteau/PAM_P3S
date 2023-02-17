@@ -133,3 +133,6 @@ FastMNMF2.py
 # data
 pra/data/
 /Sounds
+pra/test
+mushra.csv
+test.ipynb
