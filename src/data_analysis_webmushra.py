@@ -68,6 +68,7 @@ def walk_through_experiments(data, experiments, stimuli):
     n_experiment, n_stimuli = len(experiments), len(stimuli)
     fig, axs = plt.subplots(n_experiment, n_stimuli)
     for e in experiments:
+        axs[    ]
         data_experiments.append(retrieve_experiment_data(data, e))
     for i, s in enumerate(stimuli):
         for j, data in enumerate(data_experiments):
